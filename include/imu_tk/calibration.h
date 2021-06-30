@@ -345,6 +345,7 @@ private:
   
   _T g_mag_;
   const int min_num_intervals_;
+  const int max_num_iterations_;
   _T init_interval_duration_;
   int interval_n_samples_;
   bool acc_use_means_;
@@ -354,7 +355,10 @@ private:
   CalibratedTriad_<_T> init_acc_calib_, init_gyro_calib_;
   CalibratedTriad_<_T> acc_calib_, gyro_calib_;
   std::vector< TriadData_<_T> > calib_acc_samples_, calib_gyro_samples_;
-  
+  // bias bounds for acc and gyro
+  _T acc_bias_bound;
+  Eigen::Matrix<_T, 3, 1> gyr_bias_bound; 
+  int acc_bias_bound_multiplier_, gyr_bias_bound_multiplier_;
   bool verbose_output_;
 };
 

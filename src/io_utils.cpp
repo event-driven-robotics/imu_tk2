@@ -59,11 +59,15 @@ void imu_tk::importAsciiData ( const char *filename,
       break;
     case DATASET_SPACE_SEPARATED:
     default:
+      //std::cout << "space separated";
       sprintf ( format,"%%lf %%lf %%lf %%lf" );
       break;
     }
 
     int l = 0;
+    //std::cout << "time unit: " << unit << " s" << " - format is: " << format << "\n";
+    //std::cin.get();
+
     while ( getline ( infile,line ) )
     {
       int res = sscanf ( line.data(), format, &ts, &d[0], &d[1], &d[2] );
@@ -74,7 +78,8 @@ void imu_tk::importAsciiData ( const char *filename,
       else
       {
         ts /= unit;
-        samples.push_back ( TriadData_<_T> ( _T ( ts ), _T ( d[0] ), _T ( d[1] ), _T ( d[2] ) ) );
+        samples.push_back ( TriadData_<_T> ( _T ( ts ), _T ( d[0] ), _T ( d[1] ), _T (d[2] ) ) );
+        //std::cout << "data: " << ts << ", "  << d[0] << ", " << d[1] << ", " << d[2] << "\n";
       }
       l++;
     }

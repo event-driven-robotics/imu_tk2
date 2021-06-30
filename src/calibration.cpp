@@ -139,13 +139,16 @@ template <typename _T1> struct MultiPosGyroResidual
 
 template <typename _T>
   MultiPosCalibration_<_T>::MultiPosCalibration_() :
-  g_mag_(9.81),
-  min_num_intervals_(12),
-  init_interval_duration_(_T(30.0)),
-  interval_n_samples_(100),
+  g_mag_(9.805622),
+  min_num_intervals_(9),
+  init_interval_duration_(_T(50.0)),
+  interval_n_samples_(300),
   acc_use_means_(false),
   gyro_dt_(-1.0),
-  optimize_gyro_bias_(false),
+  optimize_gyro_bias_(true),
+  max_num_iterations_(100),
+  acc_bias_bound_multiplier_(2),
+  gyr_bias_bound_multiplier_(2),
   verbose_output_(false){}
 
 template <typename _T>
@@ -161,9 +164,18 @@ template <typename _T>
   
   DataInterval init_static_interval = DataInterval::initialInterval( acc_samples, init_interval_duration_ );
   Eigen::Matrix<_T, 3, 1> acc_variance = dataVariance( acc_samples, init_static_interval );
-  _T norm_th = acc_variance.norm();
+  _T norm_th = acc_variance.norm(); 
+
+  //calculate a value for the biases upper and lower bound based 
+  //on the biases in the initial static interval
+  Eigen::Matrix<_T, 3, 1> acc_initial_avg = dataMean(acc_samples, init_static_interval);
+  _T initial_average_bias = abs(acc_initial_avg.norm() - g_mag_); 
+  std::cout << "\n\nacc initial bias avg: " << initial_average_bias;
+  acc_bias_bound = acc_bias_bound_multiplier_*initial_average_bias;
+  std::cout << "\nacc bias bound: " << acc_bias_bound << "\n\n";
 
   _T min_cost = std::numeric_limits< _T >::max();
+
   int min_cost_th = -1;
   std::vector< double > min_cost_calib_params;
   
@@ -210,16 +222,29 @@ template <typename _T>
       ceres::CostFunction* cost_function =
         MultiPosAccResidual<_T>::Create ( g_mag_, static_samples[i].data() );
 
-      problem.AddResidualBlock ( cost_function, NULL /* squared loss */, acc_calib_params.data() ); 
+      problem.AddResidualBlock ( cost_function, NULL /* squared loss */, acc_calib_params.data() );
+
+      //add lower and upped bound for biases
+      //biases x, y, z are idxs 6, 7, 8 of acc_calib_params.data() array
+      problem.SetParameterLowerBound(acc_calib_params.data(), 6, -acc_bias_bound); 
+      problem.SetParameterUpperBound(acc_calib_params.data(), 6,  acc_bias_bound);
+
+      problem.SetParameterLowerBound(acc_calib_params.data(), 7, -acc_bias_bound);  
+      problem.SetParameterUpperBound(acc_calib_params.data(), 7,  acc_bias_bound); 
+
+      problem.SetParameterLowerBound(acc_calib_params.data(), 8, -acc_bias_bound);  
+      problem.SetParameterUpperBound(acc_calib_params.data(), 8,  acc_bias_bound); 
     }
     
     ceres::Solver::Options options;
     options.linear_solver_type = ceres::DENSE_QR;
     options.minimizer_progress_to_stdout = verbose_output_;
+    options.max_num_iterations = max_num_iterations_;
 
     ceres::Solver::Summary summary;
     ceres::Solve ( options, &problem, &summary );
-    if( summary.final_cost < min_cost)
+    
+    if(summary.final_cost < min_cost)// && summary.iterations.back().iteration < options.max_num_iterations)
     {
       min_cost = summary.final_cost;
       min_cost_th = th_mult;
@@ -298,6 +323,10 @@ template <typename _T>
                                     1.0, 1.0, 1.0, 
                                     gyro_bias(0), gyro_bias(1), gyro_bias(2) );
   
+  // Calculate bound for gyro biases
+  std::cout << "\n\ngyr initial bias avg: " << gyro_bias;
+  gyr_bias_bound = gyr_bias_bound_multiplier_*gyro_bias.array().abs();
+  std::cout << "\ngyr bias bound: " << gyr_bias_bound << "\n\n";
 
   // calib_gyro_samples_ already cleared in calibrateAcc()
   calib_gyro_samples_.reserve(n_samps);
@@ -319,9 +348,9 @@ template <typename _T>
   gyro_calib_params[8] = init_gyro_calib_.scaleZ();
   
   // Bias has been estimated and removed in the initialization period
-  gyro_calib_params[9] = 0.0;
-  gyro_calib_params[10] = 0.0;
-  gyro_calib_params[11] = 0.0;
+  gyro_calib_params[9]  = gyro_bias[0]; //0.0;
+  gyro_calib_params[10] = gyro_bias[1]; //0.0;
+  gyro_calib_params[11] = gyro_bias[2]; //0.0;
   
   ceres::Problem problem;
       
@@ -366,14 +395,24 @@ template <typename _T>
       MultiPosGyroResidual<_T>::Create ( g_versor_pos0, g_versor_pos1, calib_gyro_samples_,
                                          gyro_interval, gyro_dt_, optimize_gyro_bias_ );
 
-    problem.AddResidualBlock ( cost_function, NULL /* squared loss */, gyro_calib_params.data() ); 
-      
+    problem.AddResidualBlock ( cost_function, NULL /* squared loss */, gyro_calib_params.data() );
+
+    //add lower and upped bound for biases
+    //biases x, y, z are idxs 9, 10, 11 of gyro_calib_params.data() array
+    problem.SetParameterLowerBound(gyro_calib_params.data(),  9, -gyr_bias_bound[0]); 
+    problem.SetParameterUpperBound(gyro_calib_params.data(),  9,  gyr_bias_bound[0]);
+                                                                                   
+    problem.SetParameterLowerBound(gyro_calib_params.data(), 10, -gyr_bias_bound[1]);  
+    problem.SetParameterUpperBound(gyro_calib_params.data(), 10,  gyr_bias_bound[1]); 
+                                                                                   
+    problem.SetParameterLowerBound(gyro_calib_params.data(), 11, -gyr_bias_bound[2]);  
+    problem.SetParameterUpperBound(gyro_calib_params.data(), 11,  gyr_bias_bound[2]); 
   }
   
   ceres::Solver::Options options;
   options.linear_solver_type = ceres::DENSE_QR;
   options.minimizer_progress_to_stdout = verbose_output_;
-
+  options.max_num_iterations = max_num_iterations_;
   ceres::Solver::Summary summary;
 
   ceres::Solve ( options, &problem, &summary );
@@ -386,9 +425,9 @@ template <typename _T>
                                      gyro_calib_params[6],
                                      gyro_calib_params[7],
                                      gyro_calib_params[8],
-                                     gyro_bias(0) + gyro_calib_params[9],
-                                     gyro_bias(1) + gyro_calib_params[10],
-                                     gyro_bias(2) + gyro_calib_params[11]);                            
+                                     /*gyro_bias(0) +*/ gyro_calib_params[9],
+                                     /*gyro_bias(1) +*/ gyro_calib_params[10],
+                                     /*gyro_bias(2) +*/ gyro_calib_params[11]);                            
 
   // Calibrate the input gyroscopes data with the obtained calibration
   for( int i = 0; i < n_samps; i++)
