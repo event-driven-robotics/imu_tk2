@@ -355,11 +355,14 @@ private:
   CalibratedTriad_<_T> init_acc_calib_, init_gyro_calib_;
   CalibratedTriad_<_T> acc_calib_, gyro_calib_;
   std::vector< TriadData_<_T> > calib_acc_samples_, calib_gyro_samples_;
+  bool verbose_output_;
+
   // bias bounds for acc and gyro
   _T acc_bias_bound;
+  _T nominal_1g_norm_;
   Eigen::Matrix<_T, 3, 1> gyr_bias_bound; 
   int acc_bias_bound_multiplier_, gyr_bias_bound_multiplier_;
-  bool verbose_output_;
+  bool minimizeAccBiases_, minimizeGyrBiases_;
 };
 
 typedef MultiPosCalibration_<double> MultiPosCalibration;
