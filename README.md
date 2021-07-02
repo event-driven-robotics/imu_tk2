@@ -1,6 +1,23 @@
 # imu_tk2
 Imu calibration based on https://bitbucket.org/alberto_pretto/imu_tk/src/master/
 
+@author: Leandro de Souza Rosa <leandro.desouzarosa@iit.it>
+
+for installing and running instructions
+
+Ceres solver is required:
+http://ceres-solver.org/installation.html
+
+lib boost as well:
+sudo apt-get install libboost-all-dev
+
+Make sure Eigen is correctly installed or make some symb links:
+cd /usr/include
+sudo ln -sf eigen3/Eigen Eigen
+sudo ln -sf eigen3/unsupported unsupported
+
+# Origninal imu_tk README below #
+
 # IMU-TK: Inertial Measurement Unit ToolKit #
 
 The C++ IMU-TK Library (Inertial Measurement Unit ToolKit) provides simple functions and data structures to calibrate MEMS-based inertial navigation units, and to process and display IMU data. 

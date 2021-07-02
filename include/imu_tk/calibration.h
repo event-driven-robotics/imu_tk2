@@ -273,12 +273,18 @@ public:
   void setGravityMagnitude( _T g ){ g_mag_ = g; };
   
   /** @brief Set the duration in seconds of the initial static interval. Default 30 seconds. */
-  _T setInitStaticIntervalDuration( _T duration ) { init_interval_duration_ = duration; };
+  void setInitStaticIntervalDuration( _T duration ) { init_interval_duration_ = duration; };
+  
+  /** @brief Set the minimum number of static intervals */
+  void setMinNumIntervals(_T n){min_num_intervals_ = n;};
   
   /** @brief Set the number of data samples to be extracted from each detected static intervals.
    *         Default is 100.  */
   int setIntarvalsNumSamples( int num ) { interval_n_samples_ = num; };
-  
+ 
+  /** @brief Set the maximum iterations for Ceres Solver */
+  void setMaxIte(_T n){max_num_iterations_ = n;};
+
   /** @brief Set the accelerometers initial guess calibration parameters */  
   void setInitAccCalibration( CalibratedTriad_<_T> &init_calib ){ init_acc_calib_ = init_calib; };
   
@@ -296,7 +302,10 @@ public:
    *         in place of this period. Default is -1.
    */  
   void setGyroDataPeriod( _T dt ){ gyro_dt_ = dt; };
-  
+ 
+  /** @brief Set nominal reading for 1g */
+  void set1g(_T g){nominal_1g_norm_ = g; }; 
+
   /** @brief If the parameter enabled is true, the gyroscopes biases are estimated along
    *         with the calibration parameters. If false, the gyroscopes biases 
    *         (computed in the initial static period) are assumed known. */ 
@@ -304,7 +313,16 @@ public:
   
   /** @brief If the parameter enabled is true, verbose output is activeted  */   
   void enableVerboseOutput( bool enabled ){ verbose_output_ = enabled; };
-  
+ 
+  /** @brief Enable minimization of acc biases as a second objective */
+  void enableAccBiasMin( bool enabled ){ minimizeAccBiases_ = enabled; };
+
+  /** @brief Enable minimization of gyro biases as a second objective */
+  void enableGyrBiasMin( bool enabled ){ minimizeGyrBiases_ = enabled; };
+
+  /** @brief Set suffix for results files */
+  void setPlotFile(std::string f){ plotFile_ = f; };
+
   /** @brief Estimate the calibration parameters for the acceleremoters triad 
    *         (see CalibratedTriad_) using the multi-position calibration method
    * 
@@ -344,8 +362,8 @@ public:
 private:
   
   _T g_mag_;
-  const int min_num_intervals_;
-  const int max_num_iterations_;
+  int min_num_intervals_;
+  int max_num_iterations_;
   _T init_interval_duration_;
   int interval_n_samples_;
   bool acc_use_means_;
@@ -356,7 +374,8 @@ private:
   CalibratedTriad_<_T> acc_calib_, gyro_calib_;
   std::vector< TriadData_<_T> > calib_acc_samples_, calib_gyro_samples_;
   bool verbose_output_;
-
+  std::string plotFile_;
+  
   // bias bounds for acc and gyro
   _T acc_bias_bound;
   _T nominal_1g_norm_;

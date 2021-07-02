@@ -40,7 +40,7 @@ qt4_wrap_cpp(IMU_TK_VIS_EXTRA_HEADERS_MOC ${IMU_TK_VIS_EXTRA_HEADERS})
 
 include(${QT_USE_FILE})
 add_definitions(${QT_DEFINITIONS})
-
+    
 aux_source_directory( ./src IMU_TK_CORE_SRC )
 set( IMU_TK_SRC ${IMU_TK_CORE_SRC} ${IMU_TK_VIS_EXTRA_HEADERS_MOC} ${IMU_TK_VIS_EXTRA_SOURCES} )
 
@@ -56,13 +56,22 @@ message( "${IMU_TK_LIBS}" )
 
 if( BUILD_IMU_TK_EXAMPLES )
 
+
 add_executable(test_imu_calib apps/test_imu_calib.cpp)
-target_link_libraries( test_imu_calib ${IMU_TK_LIBS})
+target_link_libraries( test_imu_calib ${IMU_TK_LIBS}
+                                      ${Boost_LIBRARIES}
+                                      -lstdc++
+                                      -lboost_program_options 
+                                      -lboost_system 
+                                      -lboost_filesystem 
+                                      )
+
 set_target_properties( test_imu_calib PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin)
 
 
 add_executable(test_integration apps/test_integration.cpp)
-target_link_libraries( test_integration ${IMU_TK_LIBS})
+target_link_libraries( test_integration ${IMU_TK_LIBS}
+                                        ${Boost_LIBRARIES})
                        
 set_target_properties( test_integration PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin)
 

@@ -68,6 +68,7 @@ public:
   };
   
   bool ready() const { return gnuplot_pipe_ != NULL; };
+  
   void write( const std::string &str )
   {
     if( gnuplot_pipe_ != NULL )
@@ -117,6 +118,17 @@ template <typename _T>
   plot_impl_ptr_->write( strs.str() );
 }
 
+void Plot::save(std::string name){
+    std::stringstream commands;
+    commands << "set terminal push" << std::endl;
+    commands << "set terminal pngcairo" << std::endl;
+    commands << "set output '" << name << "'" << std::endl;
+    commands << "replot" << std::endl;
+    commands << "set terminal pop" << std::endl;
+    plot_impl_ptr_->write( commands.str() );
+    return;
+} 
+
 template <typename _T> 
   void Plot::plotIntervals ( const std::vector< TriadData_< _T > >& samples,
                                      const std::vector< DataInterval >& intervals, 
@@ -157,6 +169,7 @@ template <typename _T>
       <<"'-' title 'y' with lines, "
       <<"'-' title 'z' with lines, "
       <<"'-' title 'intervals' with lines"<<std::endl;
+  
    
   _T base_time = samples[0].timestamp();
   for( int i = range.start_idx; i <= range.end_idx; i++)
@@ -240,6 +253,7 @@ Vis3D::Vis3D ( const std::string win_name )
   w_name += " - press h for help";
   vis_impl_ptr_->setWindowTitle(w_name);
 }
+
 
 void Vis3D::registerFrame( std::string name, uint8_t r, uint8_t g, uint8_t b )
 {

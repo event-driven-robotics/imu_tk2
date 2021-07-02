@@ -44,6 +44,8 @@ public:
   Plot();
   ~Plot(){};
   
+  void save(std::string name);
+  
   template <typename _T> 
     void plotSamples( const std::vector< TriadData_<_T> > &samples,
                       DataInterval range = DataInterval() );
@@ -79,7 +81,8 @@ public:
     void setLinePos( std::string name, const _T p0[3], const _T p1[3] );
     
   void updateAndWait( int delay_ms = 0 );
-    
+
+
 private:
   
   /* Pimpl idiom */
