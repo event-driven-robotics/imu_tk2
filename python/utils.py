@@ -9,7 +9,9 @@ Created on Thu Jul  8 14:58:19 2021
 
 import numpy as np
 
+
 def readCalibParams(file):
+    #print(file)
     with open(file, 'r') as f:
         # read first 3 lines for skew
         temp = []
@@ -59,7 +61,13 @@ def readAllCalibParams(acc_params, gyr_params, suffix, skew, scale, bias):
     temp_scale_gyr = []
     temp_bias_gyr = []
     
+    assert acc_params.size == gyr_params.size, "Sizes do not match"
+    if acc_params.size == 1:
+        acc_params = [acc_params]
+        gyr_params = [gyr_params]
+    
     for acc, gyr in zip(acc_params, gyr_params):
+        
         sk, sc, bi = readCalibParams(acc)
         temp_skew_acc.append(sk)
         temp_scale_acc.append(sc)
@@ -82,7 +90,7 @@ def readAllCalibParams(acc_params, gyr_params, suffix, skew, scale, bias):
     bias[suffix]['gyr'] = np.array(temp_bias_gyr)
     
 
-def plotAll(skew, scale, bias, path):
+def plotAllCalibParams(skew, scale, bias, path):
     nbins = 20
     rwidth = 0.8
     alpha = 0.7
@@ -103,26 +111,29 @@ def plotAll(skew, scale, bias, path):
             #plot skews
             axs[0,0].hist(skew[exp][sensor][:,0,1], bins=nbins, rwidth=rwidth, alpha = alpha)
             axs[0,1].hist(skew[exp][sensor][:,0,2], bins=nbins, rwidth=rwidth, alpha = alpha)
-            axs[0,2].hist(skew[exp][sensor][:,1,2], bins=nbins, rwidth=rwidth, alpha = alpha)       
-            axs[0,0].set_ylabel('skew xy')
-            axs[0,1].set_ylabel('skew xz')
-            axs[0,2].set_ylabel('skew yz')
+            axs[0,2].hist(skew[exp][sensor][:,1,2], bins=nbins, rwidth=rwidth, alpha = alpha)      
+            axs[0,0].set_ylabel('# occurences')
+            axs[0,0].set_xlabel('skew xy')
+            axs[0,1].set_xlabel('skew xz')
+            axs[0,2].set_xlabel('skew yz')
             
             #plot scales
             axs[1,0].hist(scale[exp][sensor][:,0,0], bins=nbins, rwidth=rwidth, alpha = alpha)
             axs[1,1].hist(scale[exp][sensor][:,1,1], bins=nbins, rwidth=rwidth, alpha = alpha)
             axs[1,2].hist(scale[exp][sensor][:,2,2], bins=nbins, rwidth=rwidth, alpha = alpha)       
-            axs[1,0].set_ylabel('scale x')
-            axs[1,1].set_ylabel('scale y')
-            axs[1,2].set_ylabel('scale z')
+            axs[1,0].set_ylabel('# occurences')
+            axs[1,0].set_xlabel('scale x')
+            axs[1,1].set_xlabel('scale y')
+            axs[1,2].set_xlabel('scale z')
             
             #plot biases
             axs[2,0].hist(bias[exp][sensor][:,0], bins=nbins, rwidth=rwidth, alpha = alpha)
             axs[2,1].hist(bias[exp][sensor][:,1], bins=nbins, rwidth=rwidth, alpha = alpha)
             axs[2,2].hist(bias[exp][sensor][:,2], bins=nbins, rwidth=rwidth, alpha = alpha)       
-            axs[2,0].set_ylabel('bias x')
-            axs[2,1].set_ylabel('bias y')
-            axs[2,2].set_ylabel('bias z')
+            axs[2,0].set_ylabel('# occurences')
+            axs[2,0].set_xlabel('bias x')
+            axs[2,1].set_xlabel('bias y')
+            axs[2,2].set_xlabel('bias z')
             #fig.tight_layout()
             
             plt.savefig(path+'/'+exp+'_'+sensor+'.png')
@@ -137,19 +148,46 @@ def readRawData(file):
     return np.array(temp)
             
         
+def calibrate(data, skew, scale, bias):
+    n_samples, _ = data.shape
+    
+    # allocate array for calibrated data and copy timestamp
+    calib_data = np.empty(data.shape)
+    calib_data[:,0] = data[:,0]
+    
+    for sample in range(n_samples):
+        calib_data[sample, 1:4] = skew@scale@(data[sample, 1:4]-bias.flatten())
+    
+    return calib_data
         
         
+def integrateOrientations(gyr):
+    from pyquaternion import Quaternion
+    from scipy.spatial.transform import Rotation
+    
+    # allocate resulting array 
+    ret = np.empty(gyr.shape)
+    ret[:,0] = gyr[:,0]
+    
+    # get delta times
+    dts = np.diff(gyr[:,0])
+    dts = np.concatenate( (dts, [dts[-1]]) )
+ 
+    assert len(dts)==len(gyr)
         
+    q = Quaternion()
+    
+    for i, (dt, w) in enumerate(zip(dts, gyr[:,1:4])):
+        q.integrate(w, dt)
+        rot = Rotation.from_matrix(q.rotation_matrix)
+        #print(w,' - ',  q.angle, ' - ',  q)
+        #print(rot.as_euler('xyz') , '\n-------\n')
+        ret[i,1:4] = rot.as_euler('xyz')
         
+    return ret
         
-        
-        
-        
-        
-        
-        
-        
-        
+def num2leg(n, p=3):
+    return str(np.round( 10**p * n ) / 10**p )
         
         
         
