@@ -156,14 +156,14 @@ def calibrate(data, skew, scale, bias):
     calib_data[:,0] = data[:,0]
     
     for sample in range(n_samples):
-        calib_data[sample, 1:4] = skew@scale@(data[sample, 1:4]-bias.flatten())
+        calib_data[sample, 1:4] = skew@scale@(data[sample, 1:4] - bias.flatten())
     
     return calib_data
         
         
 def integrateOrientations(gyr):
     from pyquaternion import Quaternion
-    from scipy.spatial.transform import Rotation
+    from quaternion import rotation
     
     # allocate resulting array 
     ret = np.empty(gyr.shape)
@@ -179,7 +179,7 @@ def integrateOrientations(gyr):
     
     for i, (dt, w) in enumerate(zip(dts, gyr[:,1:4])):
         q.integrate(w, dt)
-        rot = Rotation.from_matrix(q.rotation_matrix)
+        rot = rotation.from_matrix(q.rotation_matrix)
         #print(w,' - ',  q.angle, ' - ',  q)
         #print(rot.as_euler('xyz') , '\n-------\n')
         ret[i,1:4] = rot.as_euler('xyz')
@@ -190,10 +190,58 @@ def num2leg(n, p=3):
     return str(np.round( 10**p * n ) / 10**p )
         
         
+
+def rotation_matrix_from_vectors(vec1, vec2):
+    a, b = (vec1 / np.linalg.norm(vec1)).reshape(3), (vec2 / np.linalg.norm(vec2)).reshape(3)
+    v = np.cross(a, b)
+    c = np.dot(a, b)
+    s = np.linalg.norm(v)
+    kmat = np.array([[0, -v[2], v[1]], [v[2], 0, -v[0]], [-v[1], v[0], 0]])
+    rotation_matrix = np.eye(3) + kmat + kmat.dot(kmat) * ((1 - c) / (s ** 2))
+    return rotation_matrix        
         
-        
-        
-        
+
+def gravity_compensate(ts, acc_data, gyr_data, g, Tmat, plot_path='./', suffix=''):
+    import madgwickahrs 
+    from matplotlib import pyplot as plt
+    from quaternion import rotation
+    
+    T = rotation.from_matrix(Tmat)
+
+    imu = dict()
+    imu['ts'] = ts
+    imu['acc'] = T.apply(acc_data)
+    imu['angV'] = T.apply(gyr_data)
+
+    kwargs = dict()
+    kwargs['gravityMag'] = g
+    #kwargs['imuErrorGyr'] = imu['angV'].mean(axis=0)
+    kwargs['beta'] = 1
+    kwargs['verbose'] = True
+    
+    mdg = madgwickahrs.MadgwickAHRS(**kwargs)   
+    temp = T.inv().apply(mdg.gravityCompensate(imu))
+    mdg.reset()
+    
+    # get just the data within the interval
+    gcomp_acc = np.empty(shape=(len(ts), 4))
+    gcomp_acc[:,0] = imu['ts']
+    gcomp_acc[:,1:4] = temp
+
+    if(suffix != ''):
+        #plot for sanity check
+        fig = plt.figure()
+        x = gcomp_acc[:,0]
+        y = gcomp_acc[:,1:4]
+        plt.plot(x, y, alpha=0.5)
+        plt.plot(x, np.linalg.norm(y, axis=1), alpha=0.5)
+        plt.xlabel('time (s)')
+        plt.ylabel(r'acc ($m/s^2$)')      
+        plt.legend(['x', 'y', 'z', '||acc||'])   
+        fig.savefig(plot_path+'/gcomp_acc'+suffix+'.png')
+    
+    return gcomp_acc
+
         
         
         

@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Created on Thu Jul 
 @author: Leandro de Souza Rosa <leandro.desouzarosa@iit.it>
@@ -28,7 +26,6 @@ if(not os.path.isdir(plot_path)):
 raw_acc_files_regex = '/static_acc[0-9][0-9]'
 raw_gyr_files_regex = '/static_gyr[0-9][0-9]'
 g_mag = 9.805622
-g_mag=9.805622
 nominal_gyr_scale = 250 * np.pi / (2.0 * 180.0 * 16384.0)
 nominal_acc_scale = g_mag/16384.0
 

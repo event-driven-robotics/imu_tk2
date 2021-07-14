@@ -27,7 +27,11 @@ if(not os.path.isdir(plot_path)):
     
 raw_acc_files_regex = '/static_acc[0-9][0-9]'
 raw_gyr_files_regex = '/static_gyr[0-9][0-9]'
+
 g_mag = 9.805622
+nominal_gyr_scale = 250 * np.pi / (2.0 * 180.0 * 16384.0)
+nominal_acc_scale = g_mag/16384.0
+
 
 sys.path.insert(0, repos_path)
 sys.path.insert(0, bimvee_path)
@@ -71,12 +75,17 @@ from utils import readRawData, calibrate
 #skew, scale, bias = [suffix]['acc'|'gyr']
 calib_acc_data = dict()
 calib_gyr_data = dict()
+acc_data = dict()
+gyr_data = dict()
 
 for acc, gyr in zip(acc_files, gyr_files):
-    acc_data = readRawData(acc)
-    gyr_data = readRawData(gyr)
+    #save the data
+    acc_data[acc] = readRawData(acc)
+    gyr_data[gyr] = readRawData(gyr)
+    
     print('calibrating data from files: ' + acc.split('/')[-1] + ' and ' + gyr.split('/')[-1])
     
+    # apply all the calibrations for each suffix
     calib_acc_data[acc] = dict()
     calib_gyr_data[gyr] = dict()
     
@@ -90,20 +99,20 @@ for acc, gyr in zip(acc_files, gyr_files):
             sc = scale[suffix]['acc'][calib_n]    
             bi = bias[suffix]['acc'][calib_n]    
             #temp_acc.append(str(suffix) + "_" + str(calib_n))
-            temp_acc.append( calibrate(acc_data, sk, sc, bi) )
+            temp_acc.append( calibrate(acc_data[acc], sk, sc, bi) )
 
             sk = skew[suffix]['gyr'][calib_n]    
             sc = scale[suffix]['gyr'][calib_n]    
             bi = bias[suffix]['gyr'][calib_n]  
             #temp_acc.append(str(suffix) + "_" + str(calib_n))
-            temp_gyr.append(calibrate(gyr_data, sk, sc, bi) )
+            temp_gyr.append(calibrate(gyr_data[gyr], sk, sc, bi) )
 
         temp_acc = np.array(temp_acc)
         temp_gyr = np.array(temp_gyr)
 
         calib_acc_data[acc][suffix] = temp_acc
         calib_gyr_data[gyr][suffix] = temp_gyr
-
+    
 #%% Plot the norm of the acc for the calibrated data
 from matplotlib import pyplot as plt
 from utils import num2leg
@@ -218,7 +227,88 @@ for acc_file, gyr_file in zip(calib_acc_data.keys(), calib_gyr_data.keys()):
     plt.savefig(plot_path+'/'+acc_file.split('/')[-1]+'_orientation.png')
     #input('wait')
 
+#%% Apply gravity compensation with Madgwick filter
+from utils import gravity_compensate
 
+T_imu2mdg = np.array( [ [0, 0, 1], [0, -1, 0], [1, 0, 0] ] )
+gcomp_acc_data = dict()
 
+# apply gravity comp on uncalibrated data
+for acc_file, gyr_file in zip(acc_data.keys(), gyr_data.keys()):
+    gcomp_acc_data[acc_file] = gravity_compensate(
+            acc_data[acc_file][:,0],
+            acc_data[acc_file][:,1:4]*nominal_acc_scale,
+            gyr_data[gyr_file][:,1:4]*nominal_gyr_scale,
+            g_mag, T_imu2mdg, plot_path)
 
+#%% Apply gravity compensation on calibrated data
 
+suffixes = ['base', 'optBias', 'minAccBiases'] 
+T_imu2mdg = np.array( [ [0, 0, 1], [0, -1, 0], [1, 0, 0] ] )
+gcomp_calib_acc_data = dict()
+
+for acc_file, gyr_file in zip(calib_acc_data.keys(), calib_gyr_data.keys()):
+    print(acc_file, gyr_file)
+    gcomp_calib_acc_data[acc_file] = dict()
+    
+    for i, suffix in enumerate(calib_acc_data[acc_file].keys()):
+        print(i, suffix)
+        
+        for j, (calib_acc, calib_gyr) in enumerate(zip(
+                calib_acc_data[acc_file][suffix],
+                calib_gyr_data[gyr_file][suffix]
+                )):
+            print('calib run '+str(j))
+            
+            gcomp_calib_acc_data[acc_file][suffix] = gravity_compensate(
+                    calib_acc[:,0], calib_acc[:,1:4], calib_gyr[:,1:4],
+                    g_mag, T_imu2mdg)
+                
+#%% Plot the gravity compensated accelerations
+
+from matplotlib import pyplot as plt
+from utils import integrateOrientations
+from scipy.integrate import cumtrapz
+
+suffixes = ['base', 'optBias', 'minAccBiases'] 
+plt.close('all')
+
+alpha = 0.4
+lab = ['x', 'y', 'z']
+start_time = 10;
+
+for acc_file, gyr_file in zip(calib_acc_data.keys(), calib_gyr_data.keys()):
+    print(acc_file, gyr_file)
+    
+    fig, axs = plt.subplots(3, len(suffixes), figsize=(15,15), sharex='all', sharey='row')
+    
+    for i, suffix in enumerate(calib_acc_data[acc_file].keys()):
+        print(i, suffix)
+        
+        for j, (calib_acc, calib_gyr) in enumerate(zip(
+                calib_acc_data[acc_file][suffix],
+                calib_gyr_data[gyr_file][suffix]
+                )):
+            print('calib run '+str(j))
+            
+            idx = gcomp_calib_acc_data[acc_file][suffix][:,0] >= start_time
+            x = gcomp_calib_acc_data[acc_file][suffix][idx,0]
+            y = gcomp_calib_acc_data[acc_file][suffix][idx,1:4]
+            v = cumtrapz(y, x, axis=0)
+            
+            for k in range(3):
+                axs[k][i].plot(x[1::], v[:,k], alpha=alpha, label='calib - '+str(j))
+                axs[k][i].set_xlabel('time (s)')
+                axs[k][i].set_ylabel('Vel ' + lab[k] + ' (m/s)')
+        
+        for k in range(3):
+            idx = gcomp_acc_data[acc_file][:,0] >= start_time
+            x = gcomp_acc_data[acc_file][idx,0]
+            y = gcomp_acc_data[acc_file][idx,1:4]
+            v = cumtrapz(y, x, axis=0)
+            axs[k][i].plot(x[1::], v[:,k], c='k', ls=':', label='uncalibrated')
+            axs[k][i].axhline(y=0, c='k', ls='--', label='reference')
+            axs[k][i].legend(prop={'size':8});
+            
+        axs[0][i].title.set_text(suffix)    
+    plt.savefig(plot_path+'/'+acc_file.split('/')[-1]+'_velocities.png')
