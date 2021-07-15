@@ -306,6 +306,13 @@ public:
   /** @brief Set nominal reading for 1g */
   void set1g(_T g){nominal_1g_norm_ = g; }; 
 
+  /** @brief Set alpha weight for second objective */   
+  void setAlpha(_T a){
+      if( a > 1 ) alpha_ = 1;
+      else if(a <= 0.5) alpha_ = 1;
+      else alpha_ = a; 
+  }; 
+
   /** @brief If the parameter enabled is true, the gyroscopes biases are estimated along
    *         with the calibration parameters. If false, the gyroscopes biases 
    *         (computed in the initial static period) are assumed known. */ 
@@ -361,7 +368,7 @@ public:
   
 private:
   
-  _T g_mag_;
+  _T g_mag_, alpha_;
   int min_num_intervals_;
   int max_num_iterations_;
   _T init_interval_duration_;
