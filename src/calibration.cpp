@@ -250,13 +250,14 @@ template <typename _T>
   interval_n_samples_(300),
   acc_use_means_(false),
   gyro_dt_(-1.0),
-  optimize_gyro_bias_(true),
+  optimize_gyro_bias_(false),
   max_num_iterations_(100),
   acc_bias_bound_multiplier_(2),
   gyr_bias_bound_multiplier_(2),
   nominal_1g_norm_(16384.0),
-  minimizeAccBiases_(true), 
-  minimizeGyrBiases_(true),
+  minimizeAccBiases_(false), 
+  minimizeGyrBiases_(false),
+  alpha_(0.75),
   verbose_output_(false){}
 
 template <typename _T>
@@ -472,9 +473,9 @@ template <typename _T>
   gyro_calib_params[8] = init_gyro_calib_.scaleZ();
   
   // Bias has been estimated and removed in the initialization period
-  gyro_calib_params[9]  = 0.0; //gyro_bias[0]; //0.0;
-  gyro_calib_params[10] = 0.0; //gyro_bias[1]; //0.0;
-  gyro_calib_params[11] = 0.0; //gyro_bias[2]; //0.0;
+  gyro_calib_params[9]  = gyro_bias[0]; //0.0;
+  gyro_calib_params[10] = gyro_bias[1]; //0.0;
+  gyro_calib_params[11] = gyro_bias[2]; //0.0;
   
   ceres::Problem problem;
       
@@ -554,9 +555,10 @@ template <typename _T>
                                      gyro_calib_params[6],
                                      gyro_calib_params[7],
                                      gyro_calib_params[8],
-                                     gyro_bias(0) + gyro_calib_params[9],
-                                     gyro_bias(1) + gyro_calib_params[10],
-                                     gyro_bias(2) + gyro_calib_params[11]);                            
+                                     gyro_calib_params[9],
+                                     gyro_calib_params[10],
+                                     gyro_calib_params[11]);                            
+  
   cout << "\n\n gyro bias opt params: " << gyro_calib_params[9] << ", " << gyro_calib_params[10] << ", " << gyro_calib_params[11] << "\n\n"; 
   // Calibrate the input gyroscopes data with the obtained calibration
   for( int i = 0; i < n_samps; i++)
