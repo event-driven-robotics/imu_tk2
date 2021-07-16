@@ -21,6 +21,11 @@ imu_tk2_app = imu_tk2_path+'/bin/test_imu_calib'
 data_path = '/home/leandro/results/IMUDataDump'
 plot_path = data_path+'/plots'
 
+sys.path.insert(0, repos_path)
+sys.path.insert(0, bimvee_path)
+sys.path.insert(0, wp5_slam_path)
+sys.path.insert(0, imu_tk2_path+'/python')
+
 if(not os.path.isdir(plot_path)):
     print('creating folder for plots')
     os.mkdir(plot_path)
@@ -31,12 +36,7 @@ raw_gyr_files_regex = '/static_gyr[0-9][0-9]'
 g_mag = 9.805622
 nominal_gyr_scale = 250 * np.pi / (2.0 * 180.0 * 16384.0)
 nominal_acc_scale = g_mag/16384.0
-
-
-sys.path.insert(0, repos_path)
-sys.path.insert(0, bimvee_path)
-sys.path.insert(0, wp5_slam_path)
-sys.path.insert(0, imu_tk2_path+'/python')
+suffixes = ['base', 'optGyrBias', 'minAccBiases'] 
 
 #%% get raw data files
 
@@ -54,7 +54,6 @@ from utils import readAllCalibParams#, plotAllCalibParams
 skew = dict()
 scale = dict()
 bias = dict()
-suffixes = ['base', 'optBias', 'minAccBiases'] 
 
 for suffix in suffixes:
     # get the name of all param files in the folder
@@ -117,7 +116,6 @@ for acc, gyr in zip(acc_files, gyr_files):
 from matplotlib import pyplot as plt
 from utils import num2leg
 
-suffixes = ['base', 'optBias', 'minAccBiases'] 
 plt.close('all')
 
 nbins = 30
@@ -153,7 +151,6 @@ for acc_file, gyr_file in zip(calib_acc_data.keys(), calib_gyr_data.keys()):
 from matplotlib import pyplot as plt
 from utils import num2leg
 
-suffixes = ['base', 'optBias', 'minAccBiases'] 
 plt.close('all')
 
 nbins = 30
@@ -193,7 +190,6 @@ for acc_file, gyr_file in zip(calib_acc_data.keys(), calib_gyr_data.keys()):
 from matplotlib import pyplot as plt
 from utils import integrateOrientations
 
-suffixes = ['base', 'optBias', 'minAccBiases'] 
 plt.close('all')
 
 alpha = 0.4
@@ -243,7 +239,6 @@ for acc_file, gyr_file in zip(acc_data.keys(), gyr_data.keys()):
 
 #%% Apply gravity compensation on calibrated data
 
-suffixes = ['base', 'optBias', 'minAccBiases'] 
 T_imu2mdg = np.array( [ [0, 0, 1], [0, -1, 0], [1, 0, 0] ] )
 gcomp_calib_acc_data = dict()
 
@@ -276,8 +271,7 @@ for acc_file, gyr_file in zip(calib_acc_data.keys(), calib_gyr_data.keys()):
 from matplotlib import pyplot as plt
 from utils import integrateOrientations, align_yaxis
 from scipy.integrate import cumtrapz
-
-suffixes = ['base', 'optBias', 'minAccBiases'] 
+ 
 plt.close('all')
 
 alpha = 0.4

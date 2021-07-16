@@ -147,8 +147,7 @@ struct DataInterval
    * @param end_ts Final timestamp
    */
   template <typename _T> 
-    static DataInterval fromTimestamps( const std::vector< TriadData_<_T> > &samples, 
-                                        _T start_ts, _T end_ts )
+    static DataInterval fromTimestamps( const std::vector< TriadData_<_T> > &samples,  _T start_ts, _T end_ts )
   {
     if( start_ts < 0 || end_ts <= start_ts )
       throw std::invalid_argument("Invalid timestamps");

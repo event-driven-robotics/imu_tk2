@@ -127,8 +127,8 @@ int main(int argc, char** argv)
   string gyr_params_name = gyr_file + "." + suffix;
 
   cout << "file names:\n" << acc_params_name << "\n" << gyr_params_name << "\n\n";
-  mp_calib.getAccCalib().save(acc_params_name);
-  mp_calib.getGyroCalib().save(gyr_params_name);
+  mp_calib.getAccCalib().saveAcc(acc_params_name);
+  mp_calib.getGyroCalib().saveGyr(gyr_params_name);
   
   return 0;
 }

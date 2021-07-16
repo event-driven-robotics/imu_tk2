@@ -71,7 +71,7 @@ for acc, gyr in zip(acc_files, gyr_files):
     subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
 #%% Perform calibrations on the files
-suffix = 'optBias'
+suffix = 'optGyrBias'
 
 for acc, gyr in zip(acc_files, gyr_files):
     acc_params = acc+'.'+suffix
@@ -88,9 +88,10 @@ for acc, gyr in zip(acc_files, gyr_files):
                '--acc_file='+acc, 
                '--gyr_file='+gyr, 
                '--suffix='+suffix,
-               '--opt_gyr_b=true',
                '--min_acc_b=false',
-               '--min_gyr_b=false'
+               '--min_gyr_b=false',
+               '--opt_gyr_b=true',
+               '--max_iter=500'
                ]
     print(command)
     subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -125,7 +126,7 @@ from utils import readAllCalibParams, plotAllCalibParams
 skew = dict()
 scale = dict()
 bias = dict()
-suffixes = ['base', 'optBias', 'minAccBiases'] 
+suffixes = ['base', 'optGyrBias', 'minAccBiases'] 
 
 for suffix in suffixes:
     # get the name of all param files in the folder

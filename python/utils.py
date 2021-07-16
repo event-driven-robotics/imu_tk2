@@ -50,7 +50,19 @@ def readCalibParams(file):
         bias = np.array([np.double(n) for n in temp]).reshape((3,1))
         #print(bias)
         
-    return skew, scale, bias
+         # read third 3 lines for G
+        temp = []
+        for i in range(3):
+            #skip empty lines
+            line = []
+            while(len(line)==0):
+                line = next(f).replace('\n', '').split()
+                #print('reading :', line)
+            temp = temp + line
+        g = np.array([np.double(n) for n in temp]).reshape((3,1))
+        #print(bias)
+        
+    return skew, scale, bias, g
 
 def readAllCalibParams(acc_params, gyr_params, suffix, skew, scale, bias):
   
