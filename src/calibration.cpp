@@ -45,11 +45,12 @@ using namespace std;
 
 template <typename _T1> struct MultiPosAccResidual
 {
-  MultiPosAccResidual( const _T1 &g_mag, const _T1 &alpha, const Eigen::Matrix< _T1, 3 , 1> &sample ) :
+  MultiPosAccResidual( const _T1 &g_mag, const _T1 &alpha, const Eigen::Matrix< _T1, 3 , 1> &sample, const  bool bias_residual) :
   g_mag_(g_mag),
   alpha_(alpha),
+  bias_residual_(bias_residual),
   sample_(sample){}
-  
+
   template <typename _T2>
     bool operator() ( const _T2* const params, _T2* residuals ) const
   {
@@ -64,17 +65,28 @@ template <typename _T1> struct MultiPosAccResidual
     Eigen::Matrix< _T2, 3 , 1> calib_samp = calib_triad.unbiasNormalize( raw_samp );
     residuals[0] = _T2(alpha_)*(_T2 ( g_mag_ ) - calib_samp.norm());
     
+    if (bias_residual_){
+        Eigen::Matrix<_T2, 3, 1> bias_vector( params[6], params[7], params[8] );
+        residuals[1] = _T2( (1-alpha_))*_T2(bias_vector.norm() );
+    }
     return true;
   }
   
-  static ceres::CostFunction* Create ( const _T1 &g_mag, const _T1 &alpha, const Eigen::Matrix< _T1, 3 , 1> &sample )
+  static ceres::CostFunction* Create ( const _T1 &g_mag, const _T1 &alpha, const Eigen::Matrix< _T1, 3 , 1> &sample, const  bool bias_residual )
   {
-    return ( new ceres::AutoDiffCostFunction< MultiPosAccResidual, 1, 9 > (
-               new MultiPosAccResidual<_T1>( g_mag, alpha, sample ) ) );
+    if(!bias_residual){
+        return ( new ceres::AutoDiffCostFunction< MultiPosAccResidual, 1, 9 > (
+                    new MultiPosAccResidual<_T1>( g_mag, alpha, sample, bias_residual) ) );
+    }else{
+        // the second parameter is the number of residuals to use
+        return ( new ceres::AutoDiffCostFunction< MultiPosAccResidual, 2, 9 > (
+                    new MultiPosAccResidual<_T1>( g_mag, alpha, sample, bias_residual) ) );
+    }
   }
   
   const _T1 g_mag_;
   const _T1 alpha_;
+  const bool bias_residual_;
   const Eigen::Matrix< _T1, 3 , 1> sample_;
 };
 
@@ -363,15 +375,19 @@ template <typename _T>
     
     for( int i = 0; i < static_samples.size(); i++)
     {
-      // Add acc calibration cost function
-      ceres::CostFunction* cost_function_calib = MultiPosAccResidual<_T>::Create ( g_mag_, alpha_, static_samples[i].data() );
-      problem.AddResidualBlock ( cost_function_calib, NULL /* squared loss */, acc_calib_params.data() );
+      if(!minimizeAccBiases_){
+        // Add acc calibration cost function
+        ceres::CostFunction* cost_function_calib = MultiPosAccResidual<_T>::Create ( g_mag_, alpha_, static_samples[i].data(), false );
+        problem.AddResidualBlock ( cost_function_calib, NULL /* squared loss */, acc_calib_params.data() );
       
       // Add bias reduction cost function
-      if(minimizeAccBiases_)
+      }
+      else
       {  
-        ceres::CostFunction* cost_function_biases = BiasesMinimizeResidual<_T>::Create( g_mag_, alpha_);
-        problem.AddResidualBlock ( cost_function_biases, NULL /* squared loss */, acc_calib_params.data() );
+        //ceres::CostFunction* cost_function_biases = BiasesMinimizeResidual<_T>::Create( g_mag_, alpha_);
+        //problem.AddResidualBlock ( cost_function_biases, NULL /* squared loss */, acc_calib_params.data() );
+        ceres::CostFunction* cost_function_calib = MultiPosAccResidual<_T>::Create ( g_mag_, alpha_, static_samples[i].data(), false );
+        problem.AddResidualBlock ( cost_function_calib, NULL /* squared loss */, acc_calib_params.data() );
 
         //add lower and upped bound for biases
         //biases x, y, z are idxs 6, 7, 8 of acc_calib_params.data() array

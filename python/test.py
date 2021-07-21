@@ -54,6 +54,7 @@ from utils import readAllCalibParams#, plotAllCalibParams
 skew = dict()
 scale = dict()
 bias = dict()
+gmat = dict()
 
 for suffix in suffixes:
     # get the name of all param files in the folder
@@ -64,7 +65,7 @@ for suffix in suffixes:
     acc_params = np.sort(glob.glob(data_path+acc_params_regex))
     gyr_params = np.sort(glob.glob(data_path+gyr_params_regex))
     
-    readAllCalibParams(acc_params, gyr_params, suffix, skew, scale, bias)
+    readAllCalibParams(acc_params, gyr_params, suffix, skew, scale, bias, gmat)
 
 #plotAllCalibParams(skew, scale, bias, data_path)
 
@@ -103,8 +104,9 @@ for acc, gyr in zip(acc_files, gyr_files):
             sk = skew[suffix]['gyr'][calib_n]    
             sc = scale[suffix]['gyr'][calib_n]    
             bi = bias[suffix]['gyr'][calib_n]  
+            gi = gmat[suffix]['gyr'][calib_n]  
             #temp_acc.append(str(suffix) + "_" + str(calib_n))
-            temp_gyr.append(calibrate(gyr_data[gyr], sk, sc, bi) )
+            temp_gyr.append(calibrate(gyr_data[gyr], sk, sc, bi, gi, acc_data[acc]) )
 
         temp_acc = np.array(temp_acc)
         temp_gyr = np.array(temp_gyr)
@@ -160,7 +162,9 @@ alpha = 0.4
 for acc_file, gyr_file in zip(calib_acc_data.keys(), calib_gyr_data.keys()):
     print(acc_file, gyr_file)
     
-    fig, axs = plt.subplots(3, len(suffixes), figsize=(15,15), sharex='all', sharey='all')
+    fig, axs = plt.subplots(3, len(suffixes), figsize=(15,15), 
+                            sharex='all', 
+                            sharey='all')
     
     for i, suffix in enumerate(calib_acc_data[acc_file].keys()):
         print(i, suffix)

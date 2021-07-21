@@ -56,15 +56,19 @@ def readCalibParams(file):
             #skip empty lines
             line = []
             while(len(line)==0):
-                line = next(f).replace('\n', '').split()
-                #print('reading :', line)
+                
+                try:
+                    line = next(f).replace('\n', '').split()
+                except(StopIteration):
+                    #print('EOF')
+                    return skew, scale, bias
             temp = temp + line
-        g = np.array([np.double(n) for n in temp]).reshape((3,1))
+        g = np.array([np.double(n) for n in temp]).reshape((3,3))
         #print(bias)
         
     return skew, scale, bias, g
 
-def readAllCalibParams(acc_params, gyr_params, suffix, skew, scale, bias):
+def readAllCalibParams(acc_params, gyr_params, suffix, skew, scale, bias, gmat):
   
     temp_skew_acc = []
     temp_scale_acc = []
@@ -72,6 +76,8 @@ def readAllCalibParams(acc_params, gyr_params, suffix, skew, scale, bias):
     temp_skew_gyr = []
     temp_scale_gyr = []
     temp_bias_gyr = []
+    #temp_gmat_acc = []
+    temp_gmat_gyr = []
     
     assert acc_params.size == gyr_params.size, "Sizes do not match"
     if acc_params.size == 1:
@@ -84,25 +90,31 @@ def readAllCalibParams(acc_params, gyr_params, suffix, skew, scale, bias):
         temp_skew_acc.append(sk)
         temp_scale_acc.append(sc)
         temp_bias_acc.append(bi)
+        #temp_gmat_acc.append(gi)
         
-        sk, sc, bi = readCalibParams(gyr)
+        sk, sc, bi, gi = readCalibParams(gyr)
         temp_skew_gyr.append(sk)
         temp_scale_gyr.append(sc)
         temp_bias_gyr.append(bi)
-    
+        temp_gmat_gyr.append(gi)
+        
     skew[suffix] = dict()
     scale[suffix] = dict()
     bias[suffix] = dict()
+    gmat[suffix] = dict()
     
     skew[suffix]['acc'] = np.array(temp_skew_acc)
     scale[suffix]['acc'] = np.array(temp_scale_acc)
     bias[suffix] ['acc'] = np.array(temp_bias_acc)
+    #gmat[suffix]['acc'] = np.array(temp_gmat_acc)
+    
     skew[suffix]['gyr'] = np.array(temp_skew_gyr)
     scale[suffix]['gyr'] = np.array(temp_scale_gyr)
     bias[suffix]['gyr'] = np.array(temp_bias_gyr)
+    gmat[suffix]['gyr'] = np.array(temp_gmat_gyr)
     
 
-def plotAllCalibParams(skew, scale, bias, path):
+def plotAllCalibParams(skew, scale, bias, gmat, path):
     nbins = 20
     rwidth = 0.8
     alpha = 0.7
@@ -160,18 +172,21 @@ def readRawData(file):
     return np.array(temp)
             
         
-def calibrate(data, skew, scale, bias):
+def calibrate(data, skew, scale, bias, gmat = [], other_data = []):
     n_samples, _ = data.shape
     
     # allocate array for calibrated data and copy timestamp
     calib_data = np.empty(data.shape)
     calib_data[:,0] = data[:,0]
     
-    for sample in range(n_samples):
-        calib_data[sample, 1:4] = skew@scale@(data[sample, 1:4] - bias.flatten())
-    
-    return calib_data
-        
+    if(gmat == []):
+        for sample in range(n_samples):
+            calib_data[sample, 1:4] = skew@scale@(data[sample, 1:4] - bias.flatten())
+    else:
+        for sample in range(n_samples):
+            calib_data[sample, 1:4] = scale@(skew@data[sample, 1:4] - bias.flatten()-gmat@other_data[sample, 1:4])
+
+    return calib_data      
         
 def integrateOrientations(gyr):
     from pyquaternion import Quaternion

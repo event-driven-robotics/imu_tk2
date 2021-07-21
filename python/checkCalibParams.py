@@ -126,14 +126,16 @@ from utils import readAllCalibParams, plotAllCalibParams
 skew = dict()
 scale = dict()
 bias = dict()
+gmat = dict()
+
 suffixes = ['base', 'optGyrBias', 'minAccBiases'] 
 
 for suffix in suffixes:
     # get the name of all param files in the folder
     acc_params = np.sort(glob.glob(data_path+raw_acc_files_regex+'.'+suffix))
     gyr_params = np.sort(glob.glob(data_path+raw_gyr_files_regex+'.'+suffix))    
-    readAllCalibParams(acc_params, gyr_params, suffix, skew, scale, bias)
+    readAllCalibParams(acc_params, gyr_params, suffix, skew, scale, bias, gmat)
 
-plotAllCalibParams(skew, scale, bias, plot_path)
+plotAllCalibParams(skew, scale, bias, gmat, plot_path)
 #%%
 os.system('mv ' + data_path + '/*.png' +' ' + plot_path)
