@@ -202,18 +202,18 @@ public:
    *         correcting the misalignment and the scale, 
    *         i.e., by applying the equation  gyr' = T*K*(gyr - B - G*acc)
    */
-  inline Eigen::Matrix< _T, 3 , 1> unbiasUngNormalize( const Eigen::Matrix< _T, 3 , 1> &gyr_data, const Eigen::Matrix<_T, 3, 1> &acc_data ) const
+  inline Eigen::Matrix< _T, 3 , 1> unbiasUnG( const Eigen::Matrix< _T, 3 , 1> &gyr_data, const Eigen::Matrix<_T, 3, 1> &acc_data ) const
   {
-    return scale_mat_*(mis_mat_*gyr_data - bias_vec_ - g_mat_*acc_data); 
+    return gyr_data - bias_vec_ + g_mat_*acc_data; 
   };
   
   /** @brief Normalize a gyro raw data X by removing the sensor and the acc related biases and 
    *         correcting the misalignment and the scale, 
    *         i.e., by applying the equation  gyr' = T*K*(gyr - B - G*acc)
    */
-  inline TriadData_<_T> unbiasUngNormalize( const TriadData_<_T> &gyr_data, const TriadData_<_T> &acc_data ) const
+  inline TriadData_<_T> unbiasUnG( const TriadData_<_T> &gyr_data, const TriadData_<_T> &acc_data ) const
   {
-    return TriadData_<_T>( gyr_data.timestamp(), unbiasUngNormalize( gyr_data.data(), acc_data.data() ) );
+    return TriadData_<_T>( gyr_data.timestamp(), unbiasUnG( gyr_data.data(), acc_data.data() ) );
   };
 
 private:
@@ -341,13 +341,6 @@ public:
   /** @brief Set nominal reading for 1g */
   void set1g(_T g){nominal_1g_norm_ = g; }; 
 
-  /** @brief Set alpha weight for second objective */   
-  void setAlpha(_T a){
-      if( a > 1 ) alpha_ = 1;
-      else if(a <= 0.5) alpha_ = 1;
-      else alpha_ = a; 
-  }; 
-
   /** @brief If the parameter enabled is true, the gyroscopes biases are estimated along
    *         with the calibration parameters. If false, the gyroscopes biases 
    *         (computed in the initial static period) are assumed known. */ 
@@ -356,12 +349,6 @@ public:
   /** @brief If the parameter enabled is true, verbose output is activeted  */   
   void enableVerboseOutput( bool enabled ){ verbose_output_ = enabled; };
  
-  /** @brief Enable minimization of acc biases as a second objective */
-  void enableAccBiasMin( bool enabled ){ minimizeAccBiases_ = enabled; };
-
-  /** @brief Enable minimization of gyro biases as a second objective */
-  void enableGyrBiasMin( bool enabled ){ minimizeGyrBiases_ = enabled; };
-
   /** @brief Set suffix for results files */
   void setPlotFile(std::string f){ plotFile_ = f; };
 
@@ -403,7 +390,7 @@ public:
   
 private:
   
-  _T g_mag_, alpha_;
+  _T g_mag_;
   int min_num_intervals_;
   int max_num_iterations_;
   _T init_interval_duration_;
@@ -423,7 +410,6 @@ private:
   _T nominal_1g_norm_;
   Eigen::Matrix<_T, 3, 1> gyr_bias_bound; 
   int acc_bias_bound_multiplier_, gyr_bias_bound_multiplier_;
-  bool minimizeAccBiases_, minimizeGyrBiases_;
 };
 
 typedef MultiPosCalibration_<double> MultiPosCalibration;

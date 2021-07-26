@@ -139,6 +139,10 @@ struct DataInterval
   DataInterval ( int start_idx = -1, int end_idx = -1 ) :
     start_idx ( start_idx ), end_idx ( end_idx ) {};
 
+  int size(){
+    return end_idx - start_idx + 1;
+  }
+
   /** @brief Provides a DataInterval object from a time interval. The indices are extracted
    *         from the data samples vector using a nearest neighbor approach. 
    * 

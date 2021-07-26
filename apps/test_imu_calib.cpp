@@ -25,7 +25,7 @@ int main(int argc, char** argv)
   string acc_file, gyr_file, suffix;
   double g_mag, init_interval_duration_, gyr_dt_, nominal_1g_norm_, init_acc_bias_, init_gyr_scale_, alpha_;
   int min_num_intervals_, interval_n_samples_, max_num_iterations_; 
-  bool acc_use_means_, optimize_gyro_bias_, minimizeAccBiases_, minimizeGyrBiases_, verbose_output_;
+  bool acc_use_means_, optimize_gyro_bias_, verbose_output_;
 
   po::options_description po("Options for imu_tk2");
   po.add_options()
@@ -48,8 +48,6 @@ int main(int argc, char** argv)
       // bool params
       ("acc_use_means", po::value<bool>(& acc_use_means_)->default_value(false), "Use means for acc")
       ("opt_gyr_b", po::value<bool>(& optimize_gyro_bias_)->default_value(false), "if false calculates the gyro biases bases on the initial static interval")
-      ("min_acc_b", po::value<bool>(& minimizeAccBiases_)->default_value(true), "Perform multiobjective opt to minimize the biases")
-      ("min_gyr_b", po::value<bool>(& minimizeGyrBiases_)->default_value(true), "Perform multiobjective opt to minimize the biases")
       ("verbose", po::value<bool>(& verbose_output_)->default_value(true), "Print a lot of stuff")
   
       // Initial calibration guesses
@@ -92,7 +90,6 @@ int main(int argc, char** argv)
   mp_calib.setInitStaticIntervalDuration(init_interval_duration_);
   mp_calib.setGyroDataPeriod(gyr_dt_);
   mp_calib.set1g(nominal_1g_norm_);
-  mp_calib.setAlpha(alpha_);
 
   // int params
   mp_calib.setMinNumIntervals(min_num_intervals_);
@@ -102,8 +99,6 @@ int main(int argc, char** argv)
   // bool params
   mp_calib.enableAccUseMeans(acc_use_means_);
   mp_calib.enableGyroBiasOptimization(optimize_gyro_bias_);
-  mp_calib.enableAccBiasMin(minimizeAccBiases_);
-  mp_calib.enableGyrBiasMin(minimizeGyrBiases_);
   mp_calib.enableVerboseOutput(verbose_output_);
  
   // string params
