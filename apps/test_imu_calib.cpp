@@ -23,9 +23,9 @@ int main(int argc, char** argv)
   vector< TriadData > acc_data, gyro_data;
   
   string acc_file, gyr_file, suffix;
-  double g_mag, init_interval_duration_, gyr_dt_, nominal_1g_norm_, init_acc_bias_, init_gyr_scale_;
+  double g_mag, init_interval_duration_, gyr_dt_, nominal_1g_norm_, init_acc_bias_, init_gyr_scale_, alpha_;
   int min_num_intervals_, interval_n_samples_, max_num_iterations_; 
-  bool acc_use_means_, optimize_gyro_bias_, minimizeAccBiases_, minimizeGyrBiases_, verbose_output_;
+  bool acc_use_means_, optimize_gyro_bias_, verbose_output_;
 
   po::options_description po("Options for imu_tk2");
   po.add_options()
@@ -38,6 +38,7 @@ int main(int argc, char** argv)
       ("init_interval_duration", po::value<double>(&init_interval_duration_)->default_value(50.0), "duration of the initial interval")
       ("gyr_dt", po::value<double>(& gyr_dt_)->default_value(-1), "gyro rate, -1 automatic")
       ("nominal_1g_norm", po::value<double>(& nominal_1g_norm_)->default_value(16384.0), "Datasheet value for 1g acc")
+      ("alpha", po::value<double>(& alpha_)->default_value(0.75), "weight for bias minimesation objective. Set to 1 if not 0.5 < alpha < 1")
 
       // int params
       ("min_num_intervals", po::value<int>(& min_num_intervals_)->default_value(9), "Minimum numbr of intervals to perform calibration")
@@ -46,9 +47,7 @@ int main(int argc, char** argv)
       
       // bool params
       ("acc_use_means", po::value<bool>(& acc_use_means_)->default_value(false), "Use means for acc")
-      ("opt_gyr_b", po::value<bool>(& optimize_gyro_bias_)->default_value(true), "if false calculates the gyro biases bases on the initial static interval")
-      ("min_acc_b", po::value<bool>(& minimizeAccBiases_)->default_value(true), "Perform multiobjective opt to minimize the biases")
-      ("min_gyr_b", po::value<bool>(& minimizeGyrBiases_)->default_value(true), "Perform multiobjective opt to minimize the biases")
+      ("opt_gyr_b", po::value<bool>(& optimize_gyro_bias_)->default_value(false), "if false calculates the gyro biases bases on the initial static interval")
       ("verbose", po::value<bool>(& verbose_output_)->default_value(true), "Print a lot of stuff")
   
       // Initial calibration guesses
@@ -100,8 +99,6 @@ int main(int argc, char** argv)
   // bool params
   mp_calib.enableAccUseMeans(acc_use_means_);
   mp_calib.enableGyroBiasOptimization(optimize_gyro_bias_);
-  mp_calib.enableAccBiasMin(minimizeAccBiases_);
-  mp_calib.enableGyrBiasMin(minimizeGyrBiases_);
   mp_calib.enableVerboseOutput(verbose_output_);
  
   // string params
@@ -125,8 +122,8 @@ int main(int argc, char** argv)
   string gyr_params_name = gyr_file + "." + suffix;
 
   cout << "file names:\n" << acc_params_name << "\n" << gyr_params_name << "\n\n";
-  mp_calib.getAccCalib().save(acc_params_name);
-  mp_calib.getGyroCalib().save(gyr_params_name);
+  mp_calib.getAccCalib().saveAcc(acc_params_name);
+  mp_calib.getGyroCalib().saveGyr(gyr_params_name);
   
   return 0;
 }

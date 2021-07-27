@@ -45,10 +45,11 @@ using namespace std;
 
 template <typename _T1> struct MultiPosAccResidual
 {
-  MultiPosAccResidual( const _T1 &g_mag, const Eigen::Matrix< _T1, 3 , 1> &sample ) :
+  MultiPosAccResidual( const _T1 &g_mag, const Eigen::Matrix< _T1, 3 , 1> &sample, const  bool bias_residual) :
   g_mag_(g_mag),
+  bias_residual_(bias_residual),
   sample_(sample){}
-  
+
   template <typename _T2>
     bool operator() ( const _T2* const params, _T2* residuals ) const
   {
@@ -61,80 +62,61 @@ template <typename _T1> struct MultiPosAccResidual
                                      params[6], params[7], params[8] );
     
     Eigen::Matrix< _T2, 3 , 1> calib_samp = calib_triad.unbiasNormalize( raw_samp );
-    residuals[0] = _T2 ( g_mag_ ) - calib_samp.norm();
+    residuals[0] = (_T2 ( g_mag_ ) - calib_samp.norm());
     
     return true;
   }
   
-  static ceres::CostFunction* Create ( const _T1 &g_mag, const Eigen::Matrix< _T1, 3 , 1> &sample )
+  static ceres::CostFunction* Create ( const _T1 &g_mag, const Eigen::Matrix< _T1, 3 , 1> &sample, const  bool bias_residual )
   {
-    return ( new ceres::AutoDiffCostFunction< MultiPosAccResidual, 1, 9 > (
-               new MultiPosAccResidual<_T1>( g_mag, sample ) ) );
+    if(!bias_residual){
+        return ( new ceres::AutoDiffCostFunction< MultiPosAccResidual, 1, 9 > (
+                    new MultiPosAccResidual<_T1>( g_mag, sample, bias_residual) ) );
+    }else{
+        // the second parameter is the number of residuals to use
+        return ( new ceres::AutoDiffCostFunction< MultiPosAccResidual, 2, 9 > (
+                    new MultiPosAccResidual<_T1>( g_mag, sample, bias_residual) ) );
+    }
   }
   
   const _T1 g_mag_;
+  const bool bias_residual_;
   const Eigen::Matrix< _T1, 3 , 1> sample_;
 };
 
-template <typename _T1> struct BiasesMinimizeResidual
-{
-  BiasesMinimizeResidual(const _T1 &g_mag):
-  g_mag_(g_mag){}
-
-  template <typename _T2>
-    bool operator() ( const _T2* const params, _T2* residuals ) const
-  {
-    Eigen::Matrix< _T2, 3 , 1> zeros( _T2(0), _T2(0), _T2(0) );
-    CalibratedTriad_<_T2> calib_triad( params[0], params[1], params[2], 
-                                     _T2(0), _T2(0), _T2(0),
-                                     params[3], params[4], params[5], 
-                                     params[6], params[7], params[8] );
-    
-    Eigen::Matrix< _T2, 3 , 1> calib_biases = calib_triad.unbiasNormalize( zeros );
-
-    residuals[0] = calib_biases.norm();
-    return true;
-  }
-  
-  static ceres::CostFunction* Create ( const _T1 &g_mag )
-  {
-    return ( new ceres::AutoDiffCostFunction< BiasesMinimizeResidual, 1, 9 > (
-               new BiasesMinimizeResidual<_T1>( g_mag ) ) );
-  }
-  
-  const _T1 g_mag_;
-};
-
 //-------------------------------------- Gyro residual ----------------------------------------------
+
 template <typename _T1> struct MultiPosGyroResidual
 {
   MultiPosGyroResidual( const Eigen::Matrix< _T1, 3 , 1> &g_versor_pos0, 
                         const Eigen::Matrix< _T1, 3 , 1> &g_versor_pos1,
                         const std::vector< TriadData_<_T1> > &gyro_samples, 
                         const DataInterval &gyro_interval_pos01, 
-                        _T1 dt, bool optimize_bias) :
+                        _T1 dt) :
 
   g_versor_pos0_(g_versor_pos0), 
   g_versor_pos1_(g_versor_pos1),
   gyro_samples_(gyro_samples),
   interval_pos01_(gyro_interval_pos01),
-  dt_(dt), optimize_bias_(optimize_bias){}
+  dt_(dt){}
   
   template <typename _T2>
     bool operator() ( const _T2* const params, _T2* residuals ) const
   {
-    CalibratedTriad_<_T2> calib_triad( params[0], params[1], params[2], 
-                                      params[3], params[4], params[5], 
-                                      params[6], params[7], params[8],
-                                      optimize_bias_?params[9]:_T2(0), 
-                                      optimize_bias_?params[10]:_T2(0), 
-                                      optimize_bias_?params[11]:_T2(0) );
+    CalibratedTriad_<_T2> calib_triad;
+        calib_triad = CalibratedTriad_<_T2>( params[0], params[1], params[2],
+                                             params[3], params[4], params[5], 
+                                             params[6], params[7], params[8],
+                                             _T2(0), _T2(0), _T2(0) );
 
     std::vector< TriadData_<_T2> > calib_gyro_samples;
     calib_gyro_samples.reserve( interval_pos01_.end_idx - interval_pos01_.start_idx + 1 );
+   
+    //cout << gyro_samples_.size() << " - " << calib_acc_samples_.size() << endl;
     
-    for( int i = interval_pos01_.start_idx; i <= interval_pos01_.end_idx; i++ )
-      calib_gyro_samples.push_back( TriadData_<_T2>( calib_triad.unbiasNormalize( gyro_samples_[i] ) ) );
+    for( int i = interval_pos01_.start_idx; i <= interval_pos01_.end_idx; i++ ){
+        calib_gyro_samples.push_back( TriadData_<_T2>( calib_triad.unbiasNormalize( gyro_samples_[i] ) ) );
+    }
     
     Eigen::Matrix< _T2, 3 , 3> rot_mat;
     integrateGyroInterval( calib_gyro_samples, rot_mat, _T2(dt_) );
@@ -153,87 +135,56 @@ template <typename _T1> struct MultiPosGyroResidual
                                        const Eigen::Matrix< _T1, 3 , 1> &g_versor_pos1,
                                        const std::vector< TriadData_<_T1> > &gyro_samples, 
                                        const DataInterval &gyro_interval_pos01, 
-                                       _T1 dt, bool optimize_bias )
+                                       _T1 dt )
   {
-    if( optimize_bias )
-      return ( new ceres::AutoDiffCostFunction< MultiPosGyroResidual, 3, 12 > (
-                new MultiPosGyroResidual( g_versor_pos0, g_versor_pos1, gyro_samples, 
-                                          gyro_interval_pos01, dt, optimize_bias ) ) );
-    else
-      return ( new ceres::AutoDiffCostFunction< MultiPosGyroResidual, 3, 9 > (
-                new MultiPosGyroResidual( g_versor_pos0, g_versor_pos1, gyro_samples, 
-                                          gyro_interval_pos01, dt, optimize_bias ) ) );
+      return ( new ceres::AutoDiffCostFunction< MultiPosGyroResidual, 3, 21 > (
+                  new MultiPosGyroResidual( g_versor_pos0, g_versor_pos1, gyro_samples,  
+                      gyro_interval_pos01, dt ) ) );
   }
   
   const Eigen::Matrix< _T1, 3 , 1> g_versor_pos0_, g_versor_pos1_;
   const std::vector< TriadData_<_T1> > gyro_samples_;
   const DataInterval interval_pos01_;
   const _T1 dt_;
-  const bool optimize_bias_;
 };
 
 template <typename _T1> struct GyroBiasMinimizeResidual
 {
-  GyroBiasMinimizeResidual( const Eigen::Matrix< _T1, 3 , 1> &g_versor_pos0, 
-                        const Eigen::Matrix< _T1, 3 , 1> &g_versor_pos1,
-                        const std::vector< TriadData_<_T1> > &gyro_samples, 
-                        const DataInterval &gyro_interval_pos01, 
-                        _T1 dt, bool optimize_bias) :
+  GyroBiasMinimizeResidual( const Eigen::Matrix< _T1, 3 , 1> &gyro_sample, 
+                            const Eigen::Matrix< _T1, 3 , 1> &acc_sample 
+                            ) :
 
-  g_versor_pos0_(g_versor_pos0), 
-  g_versor_pos1_(g_versor_pos1),
-  gyro_samples_(gyro_samples),
-  interval_pos01_(gyro_interval_pos01),
-  dt_(dt), optimize_bias_(optimize_bias){}
+  gyro_sample_(gyro_sample),
+  acc_sample_(acc_sample){}
   
   template <typename _T2>
     bool operator() ( const _T2* const params, _T2* residuals ) const
   {
-    CalibratedTriad_<_T2> calib_triad( params[0], params[1], params[2], 
-                                      params[3], params[4], params[5], 
-                                      params[6], params[7], params[8],
-                                      optimize_bias_?params[9]:_T2(0), 
-                                      optimize_bias_?params[10]:_T2(0), 
-                                      optimize_bias_?params[11]:_T2(0) );
-
-    std::vector< TriadData_<_T2> > calib_gyro_samples;
-    calib_gyro_samples.reserve( interval_pos01_.end_idx - interval_pos01_.start_idx + 1 );
-   
-    for( int i = interval_pos01_.start_idx; i <= interval_pos01_.end_idx; i++ )
-    {
-        TriadData_<_T2> zeros = TriadData_<_T2>(_T2(gyro_samples_[i].timestamp()), _T2(0), _T2(0), _T2(0));
-        calib_gyro_samples.push_back( TriadData_<_T2>( calib_triad.unbiasNormalize( zeros ) ) );
-    }
-
-
-    Eigen::Matrix< _T2, 3 , 3> rot_mat;
-    integrateGyroInterval( calib_gyro_samples, rot_mat, _T2(dt_) );
+    Eigen::Matrix<_T2, 3, 1> g(_T2(gyro_sample_(0)), _T2(gyro_sample_(1)), _T2(gyro_sample_(2)));
+    Eigen::Matrix<_T2, 3, 1> a(_T2(acc_sample_(0)), _T2(acc_sample_(1)), _T2(acc_sample_(2)));
+    Eigen::Matrix<_T2, 3, 1> bias(params[0], params[1], params[2]);
+    Eigen::Matrix<_T2, 3, 3> G;
+    G << params[3], params[4], params[5], 
+         params[6], params[7], params[8],
+         params[9], params[10], params[11];
     
-    Eigen::Matrix< _T2, 3 , 1> diff = rot_mat.transpose()*g_versor_pos0_.template cast<_T2>(); 
-    
-    residuals[0] = diff(0);
-    residuals[1] = diff(1);
-    residuals[2] = diff(2);
+    Eigen::Matrix<_T2, 3, 1> calib_vec = bias - g + G*a;
+     
+    residuals[0] = _T2(calib_vec.norm());
     
     return true;
   }
   
-  static ceres::CostFunction* Create ( const Eigen::Matrix< _T1, 3 , 1> &g_versor_pos0, 
-                                       const Eigen::Matrix< _T1, 3 , 1> &g_versor_pos1,
-                                       const std::vector< TriadData_<_T1> > &gyro_samples, 
-                                       const DataInterval &gyro_interval_pos01, 
-                                       _T1 dt, bool optimize_bias )
+  static ceres::CostFunction* Create ( const Eigen::Matrix< _T1, 3 , 1> &gyro_sample, 
+                                       const Eigen::Matrix< _T1, 3 , 1> &acc_sample 
+                                      )
   {
-    return ( new ceres::AutoDiffCostFunction< GyroBiasMinimizeResidual, 3, 12 > (
-        new GyroBiasMinimizeResidual( g_versor_pos0, g_versor_pos1, gyro_samples, 
-                                  gyro_interval_pos01, dt, optimize_bias ) ) );
+    return ( new ceres::AutoDiffCostFunction< GyroBiasMinimizeResidual, 1, 12 > (
+        new GyroBiasMinimizeResidual(  gyro_sample, acc_sample ) ));
   }
   
-  const Eigen::Matrix< _T1, 3 , 1> g_versor_pos0_, g_versor_pos1_;
-  const std::vector< TriadData_<_T1> > gyro_samples_;
-  const DataInterval interval_pos01_;
-  const _T1 dt_;
-  const bool optimize_bias_;
+  const Eigen::Matrix< _T1, 3 , 1> gyro_sample_;
+  const Eigen::Matrix< _T1, 3 , 1> acc_sample_;
 };
 
 //-------------------------------- Optimize routines ----------------------------------
@@ -246,13 +197,11 @@ template <typename _T>
   interval_n_samples_(300),
   acc_use_means_(false),
   gyro_dt_(-1.0),
-  optimize_gyro_bias_(true),
+  optimize_gyro_bias_(false),
   max_num_iterations_(100),
   acc_bias_bound_multiplier_(2),
   gyr_bias_bound_multiplier_(2),
   nominal_1g_norm_(16384.0),
-  minimizeAccBiases_(true), 
-  minimizeGyrBiases_(true),
   verbose_output_(false){}
 
 template <typename _T>
@@ -327,15 +276,9 @@ template <typename _T>
     
     for( int i = 0; i < static_samples.size(); i++)
     {
-      // Add acc calibration cost function
-      ceres::CostFunction* cost_function_calib = MultiPosAccResidual<_T>::Create ( g_mag_, static_samples[i].data() );
-      problem.AddResidualBlock ( cost_function_calib, NULL /* squared loss */, acc_calib_params.data() );
-      
-      // Add bias reduction cost function
-      if(minimizeAccBiases_)
-      {  
-        ceres::CostFunction* cost_function_biases = BiasesMinimizeResidual<_T>::Create( g_mag_ );
-        problem.AddResidualBlock ( cost_function_biases, NULL /* squared loss */, acc_calib_params.data() );
+        // Add acc calibration cost function
+        ceres::CostFunction* cost_function_calib = MultiPosAccResidual<_T>::Create ( g_mag_, static_samples[i].data(), false );
+        problem.AddResidualBlock ( cost_function_calib, NULL /* squared loss */, acc_calib_params.data() );
 
         //add lower and upped bound for biases
         //biases x, y, z are idxs 6, 7, 8 of acc_calib_params.data() array
@@ -344,10 +287,9 @@ template <typename _T>
 
         problem.SetParameterLowerBound(acc_calib_params.data(), 7, -acc_bias_bound);  
         problem.SetParameterUpperBound(acc_calib_params.data(), 7,  acc_bias_bound); 
-    
+
         problem.SetParameterLowerBound(acc_calib_params.data(), 8, -acc_bias_bound);  
         problem.SetParameterUpperBound(acc_calib_params.data(), 8,  acc_bias_bound); 
-      }
     }
     
     ceres::Solver::Options options;
@@ -419,7 +361,7 @@ template <typename _T>
 {
   if( !calibrateAcc( acc_samples ) )
     return false;
-  
+  cout << " \n\n-----------------------------------\n\nacc_calibration sucessfull, returned: " << acc_calib_ << endl; 
   cout<<"Gyroscopes calibration: calibrating..."<<endl;
   
   std::vector< TriadData_<_T> > static_acc_means;
@@ -431,12 +373,168 @@ template <typename _T>
   int n_static_pos = static_acc_means.size(), n_samps = gyro_samples.size();
   
   // Compute the gyroscopes biases in the (static) initialization interval
-  DataInterval init_static_interval = DataInterval::initialInterval( gyro_samples, init_interval_duration_ );
-  Eigen::Matrix<_T, 3, 1> gyro_bias = dataMean( gyro_samples, init_static_interval );
+  DataInterval init_static_interval = DataInterval::initialInterval( gyro_samples,
+          init_interval_duration_ );
   
-  gyro_calib_ = CalibratedTriad_<_T>(0, 0, 0, 0, 0, 0, 
-                                    1.0, 1.0, 1.0, 
-                                    gyro_bias(0), gyro_bias(1), gyro_bias(2) );
+  //--------------------------------------------------------------------------------------------------------
+  //-------------------------The loop to try to optimize for gyro bias--------------------------------------
+  //-------------------------using static intervals --------------------------------------------------------
+  //--------------------------------------------------------------------------------------------------------
+  //--------------------------------------------------------------------------------------------------------
+  ceres::Solver::Summary summary;
+  Eigen::Matrix<_T, 3, 1> gyro_bias;
+  Eigen::Matrix<_T, 3, 3> gyro_G;
+  
+  if( !optimize_gyro_bias_ ){
+    gyro_bias = dataMean( gyro_samples, init_static_interval );
+    gyro_G << 0,0,0,0,0,0,0,0,0;
+  }else{
+      Eigen::Matrix<_T, 3, 1> acc_variance = dataVariance( acc_samples, init_static_interval );
+      _T norm_th = acc_variance.norm(); 
+
+      _T min_cost = std::numeric_limits< _T >::max();
+      int min_cost_th = -1;
+      std::vector< double > min_cost_calib_params;
+      
+      
+      for (int th_mult = 2; th_mult <= 10; th_mult++)
+      {
+        std::vector< imu_tk::DataInterval > static_intervals;
+        std::vector< imu_tk::TriadData_<_T> > static_acc_samples, static_gyr_samples;
+        std::vector< DataInterval > extracted_acc_intervals, extracted_gyr_intervals;
+       
+        // Get the static intervals for this threshold 
+        staticIntervalsDetector ( acc_samples, th_mult*norm_th, static_intervals );
+        
+        // acc data during static intervals 
+        // TODO: get calibrated acc data instead
+        extractIntervalsSamples ( acc_samples, static_intervals, 
+                                  static_acc_samples, extracted_acc_intervals,
+                                  interval_n_samples_, acc_use_means_ );
+
+        // gyro data during static intervals
+        extractIntervalsSamples ( gyro_samples, static_intervals,           
+                                  static_gyr_samples, extracted_gyr_intervals,
+                                  interval_n_samples_, acc_use_means_ );
+
+        if(verbose_output_)
+          cout<<"Gyroscope bias calibration: extracted "<<extracted_intervals.size()
+              <<" intervals using threshold multiplier "<<th_mult<<" -> ";
+        
+        // TODO Perform here a quality test
+        if( extracted_intervals.size() < min_num_intervals_)
+        {
+          if( verbose_output_) cout<<"Not enough intervals, calibration is not possible"<<endl;
+          continue;
+        }
+        
+        if( verbose_output_) cout<<"Trying calibrate... "<<endl;
+        
+        std::vector< double > gyro_bias_params(12);
+        Eigen::Matrix<_T, 3, 1> initial_bias(_T(0), _T(0), _T(0));
+
+        int size_accumulator = 0; 
+        for( auto interval : extracted_gyr_intervals ){
+            initial_bias += interval.size()*dataMean( gyro_samples, interval );
+            size_accumulator += interval.size();
+            //cout << "\n-----\n" << initial_bias << ", " << size_accumulator << endl;
+        }
+        initial_bias /= size_accumulator;
+        cout << "\n ----- \n Average gyro bias in different static positions: \n" << initial_bias << ", " << size_accumulator << endl;
+
+      
+        gyro_bias_params[0] = initial_bias[0];
+        gyro_bias_params[1] = initial_bias[1];
+        gyro_bias_params[2] = initial_bias[2];
+     
+        //TODO: Get initial guesses for the acc
+        gyro_bias_params[3]  = 1; 
+        gyro_bias_params[4]  = 0;
+        gyro_bias_params[5]  = 0;
+      
+        gyro_bias_params[6]  = 0;
+        gyro_bias_params[7]  = 1;
+        gyro_bias_params[8]  = 0;
+      
+        gyro_bias_params[9]  = 0;
+        gyro_bias_params[10] = 0;
+        gyro_bias_params[11] = 1;
+      
+        ceres::Problem problem;
+
+        cout << "\n sanity check: " << static_gyr_samples.size() - static_acc_samples.size() << " = 0" << endl;
+
+        for( int i = 0; i < static_gyr_samples.size(); i++){
+            // Add acc calibration cost function
+            ceres::CostFunction* cost_function_calib = GyroBiasMinimizeResidual<_T>::Create (
+                    static_gyr_samples[i].data(),
+                    static_acc_samples[i].data()
+                    );
+            problem.AddResidualBlock ( cost_function_calib, NULL, gyro_bias_params.data() );
+
+            //add lower and upped bound for biases
+            //biases x, y, z are idxs 6, 7, 8 of acc_calib_params.data() array
+            /*
+            problem.SetParameterLowerBound(acc_calib_params.data(), 6, -acc_bias_bound); 
+            problem.SetParameterUpperBound(acc_calib_params.data(), 6,  acc_bias_bound);
+
+            problem.SetParameterLowerBound(acc_calib_params.data(), 7, -acc_bias_bound);  
+            problem.SetParameterUpperBound(acc_calib_params.data(), 7,  acc_bias_bound); 
+      
+            problem.SetParameterLowerBound(acc_calib_params.data(), 8, -acc_bias_bound);  
+            problem.SetParameterUpperBound(acc_calib_params.data(), 8,  acc_bias_bound); 
+            */
+        }
+      
+        ceres::Solver::Options options;
+        options.linear_solver_type = ceres::DENSE_QR;
+        options.minimizer_progress_to_stdout = verbose_output_;
+        options.max_num_iterations = max_num_iterations_;
+
+        ceres::Solve ( options, &problem, &summary );
+      
+        if(summary.final_cost < min_cost && summary.iterations.back().iteration < max_num_iterations_)
+        {
+            min_cost = summary.final_cost;
+            min_cost_th = th_mult;
+            min_cost_static_intervals_ = static_intervals;
+            min_cost_calib_params = gyro_bias_params;
+        }
+        cout<<"residual "<<summary.final_cost<<endl;
+      } 
+
+      
+      if( min_cost_th < 0 )
+      {
+        if(verbose_output_) 
+          cout<<"Accelerometers calibration: Can't obtain any calibratin with the current dataset"<<endl;
+        return false;
+      }
+      
+      gyro_bias << min_cost_calib_params[0], min_cost_calib_params[1], min_cost_calib_params[2];
+
+      gyro_G << min_cost_calib_params[3], min_cost_calib_params[4], min_cost_calib_params[5],
+               min_cost_calib_params[6], min_cost_calib_params[7], min_cost_calib_params[8], 
+               min_cost_calib_params[9], min_cost_calib_params[10], min_cost_calib_params[11]; 
+        
+      cout << "\n'---------\ngyro bias calibrations results:\nbias:\n" << gyro_bias << "\nG:\n" << gyro_G << endl;
+  }
+//--------------------------------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------------
+
+
+  gyro_calib_ = CalibratedTriad_<_T>(
+          0, 0, 0,
+          0, 0, 0,
+          1.0, 1.0, 1.0,
+          gyro_bias(0), gyro_bias(1), gyro_bias(2),
+          gyro_G(0), gyro_G(1), gyro_G(2),
+          gyro_G(3), gyro_G(4), gyro_G(5),
+          gyro_G(6), gyro_G(7), gyro_G(8)
+          );
   
   // Calculate bound for gyro biases
   std::cout << "\n\ngyr initial bias avg: \n" << gyro_bias;
@@ -445,11 +543,22 @@ template <typename _T>
 
   // calib_gyro_samples_ already cleared in calibrateAcc()
   calib_gyro_samples_.reserve(n_samps);
-  // Remove the bias
-  for( int i = 0; i < n_samps; i++ )
-    calib_gyro_samples_.push_back(gyro_calib_.unbias(gyro_samples[i]));
+ 
+  if( !optimize_gyro_bias_ ){
+    // Remove the bias
+    for( int i = 0; i < n_samps; i++ )
+        calib_gyro_samples_.push_back(gyro_calib_.unbias(gyro_samples[i]));
+  }
+  else{
+    for( int i = 0; i < n_samps; i++ )
+        // remove the bias and G*acc here
+        calib_gyro_samples_.push_back(gyro_calib_.unbiasUnG(gyro_samples[i], acc_samples[i]));
+  }
   
-  std::vector< double > gyro_calib_params(12);
+  // vector for the calib params 
+  std::vector< double > gyro_calib_params;
+  gyro_calib_params.resize(9);
+  cout << "allocated # params: " << gyro_calib_params.size() << endl;
 
   gyro_calib_params[0] = init_gyro_calib_.misYZ();
   gyro_calib_params[1] = init_gyro_calib_.misZY();
@@ -457,15 +566,9 @@ template <typename _T>
   gyro_calib_params[3] = init_gyro_calib_.misXZ();
   gyro_calib_params[4] = init_gyro_calib_.misXY();
   gyro_calib_params[5] = init_gyro_calib_.misYX();
-  
   gyro_calib_params[6] = init_gyro_calib_.scaleX();
   gyro_calib_params[7] = init_gyro_calib_.scaleY();
   gyro_calib_params[8] = init_gyro_calib_.scaleZ();
-  
-  // Bias has been estimated and removed in the initialization period
-  gyro_calib_params[9]  = 0.0; //gyro_bias[0]; //0.0;
-  gyro_calib_params[10] = 0.0; //gyro_bias[1]; //0.0;
-  gyro_calib_params[11] = 0.0; //gyro_bias[2]; //0.0;
   
   ceres::Problem problem;
       
@@ -505,17 +608,15 @@ template <typename _T>
 //         <<" v1 : "<< g_versor_pos1(0)<<" "<< g_versor_pos1(1)<<" "<< g_versor_pos1(2)<<endl;
     
     DataInterval gyro_interval(gyro_idx0, gyro_idx1);
-   
+
     //  Add acc calibration cost function    
-    ceres::CostFunction* cost_function_calib =  MultiPosGyroResidual<_T>::Create ( g_versor_pos0, g_versor_pos1, calib_gyro_samples_, gyro_interval, gyro_dt_, optimize_gyro_bias_ );
+    ceres::CostFunction* cost_function_calib =  MultiPosGyroResidual<_T>::Create ( g_versor_pos0, g_versor_pos1, calib_gyro_samples_,  gyro_interval, gyro_dt_ );
     problem.AddResidualBlock ( cost_function_calib, NULL /* squared loss */, gyro_calib_params.data() );
 
+    /*
     //  Add bias reduction cost function
-    if(minimizeGyrBiases_)
-    {
-        ceres::CostFunction* cost_function_biases =  GyroBiasMinimizeResidual<_T>::Create ( g_versor_pos0, g_versor_pos1, calib_gyro_samples_, gyro_interval, gyro_dt_, optimize_gyro_bias_ );
-        problem.AddResidualBlock ( cost_function_biases, NULL /* squared loss */, gyro_calib_params.data() );
-
+        //ceres::CostFunction* cost_function_biases =  GyroBiasMinimizeResidual<_T>::Create ( g_versor_pos0, g_versor_pos1, calib_gyro_samples_, gyro_interval, gyro_dt_, optimize_gyro_bias_ );
+        //problem.AddResidualBlock ( cost_function_biases, NULL, gyro_calib_params.data() );
         //add lower and upped bound for biases
         //biases x, y, z are idxs 9, 10, 11 of gyro_calib_params.data() array
         problem.SetParameterLowerBound(gyro_calib_params.data(),  9, -gyr_bias_bound[0]); 
@@ -526,29 +627,30 @@ template <typename _T>
                                                                                    
         problem.SetParameterLowerBound(gyro_calib_params.data(), 11, -gyr_bias_bound[2]);  
         problem.SetParameterUpperBound(gyro_calib_params.data(), 11,  gyr_bias_bound[2]); 
-    }
+    */
   }
   
   ceres::Solver::Options options;
   options.linear_solver_type = ceres::DENSE_QR;
   options.minimizer_progress_to_stdout = verbose_output_;
   options.max_num_iterations = max_num_iterations_;
-  ceres::Solver::Summary summary;
+//  ceres::Solver::Summary summary;
 
   ceres::Solve ( options, &problem, &summary );
-  gyro_calib_ = CalibratedTriad_<_T>( gyro_calib_params[0],
-                                     gyro_calib_params[1],
-                                     gyro_calib_params[2],
-                                     gyro_calib_params[3],
-                                     gyro_calib_params[4],
-                                     gyro_calib_params[5],
-                                     gyro_calib_params[6],
-                                     gyro_calib_params[7],
-                                     gyro_calib_params[8],
-                                     gyro_bias(0) + gyro_calib_params[9],
-                                     gyro_bias(1) + gyro_calib_params[10],
-                                     gyro_bias(2) + gyro_calib_params[11]);                            
-  cout << "\n\n gyro bias opt params: " << gyro_calib_params[9] << ", " << gyro_calib_params[10] << ", " << gyro_calib_params[11] << "\n\n"; 
+  gyro_calib_ = CalibratedTriad_<_T>(
+          gyro_calib_params[0], gyro_calib_params[1], gyro_calib_params[2],
+          gyro_calib_params[3], gyro_calib_params[4], gyro_calib_params[5],
+          gyro_calib_params[6], gyro_calib_params[7], gyro_calib_params[8],
+          _T(gyro_bias(0)), _T(gyro_bias(1)), _T(gyro_bias(2)),
+          _T(gyro_G(0)), _T(gyro_G(1)), _T(gyro_G(2)),
+          _T(gyro_G(3)), _T(gyro_G(4)), _T(gyro_G(5)),
+          _T(gyro_G(6)), _T(gyro_G(7)), _T(gyro_G(8))
+          );
+  
+  cout << "\n\n gyro bias opt params:\n" << gyro_bias(0) << endl;
+  cout << "\n gyro G params:\n" << gyro_G  ;
+  cout << "\n" << endl;
+  
   // Calibrate the input gyroscopes data with the obtained calibration
   for( int i = 0; i < n_samps; i++)
     calib_gyro_samples_.push_back( gyro_calib_.unbiasNormalize( gyro_samples[i]) );

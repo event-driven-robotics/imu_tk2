@@ -64,14 +64,12 @@ for acc, gyr in zip(acc_files, gyr_files):
                '--gyr_file='+gyr, 
                '--suffix='+suffix,
                '--opt_gyr_b=false',
-               '--min_acc_b=false',
-               '--min_gyr_b=false'
                ]
     print(command)
     subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
 #%% Perform calibrations on the files
-suffix = 'optBias'
+suffix = 'optGyrBias'
 
 for acc, gyr in zip(acc_files, gyr_files):
     acc_params = acc+'.'+suffix
@@ -89,50 +87,27 @@ for acc, gyr in zip(acc_files, gyr_files):
                '--gyr_file='+gyr, 
                '--suffix='+suffix,
                '--opt_gyr_b=true',
-               '--min_acc_b=false',
-               '--min_gyr_b=false'
+               '--max_iter=500'
                ]
     print(command)
     subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-#%% Perform calibrations on the files
-suffix = 'minAccBiases'
-
-for acc, gyr in zip(acc_files, gyr_files):
-    acc_params = acc+'.'+suffix
-    gyr_params = gyr+'.'+suffix
-    
-    # skip if these were already performed
-    if(os.path.isfile(acc_params) and os.path.isfile(gyr_params)):
-        print('already calculated ' + acc_params + ' and ' + gyr_params)
-        continue
-
-    print(acc, gyr)
-
-    command = [imu_tk2_app,
-               '--acc_file='+acc, 
-               '--gyr_file='+gyr, 
-               '--suffix='+suffix,
-               '--opt_gyr_b=false',
-               '--min_acc_b=true',
-               '--min_gyr_b=false'
-               ]
-    print(command)
-    subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 #%% Read the parameters and plot them
 from utils import readAllCalibParams, plotAllCalibParams
 
 skew = dict()
 scale = dict()
 bias = dict()
-suffixes = ['base', 'optBias', 'minAccBiases'] 
+gmat = dict()
+
+suffixes = ['base', 'optGyrBias'] 
 
 for suffix in suffixes:
     # get the name of all param files in the folder
     acc_params = np.sort(glob.glob(data_path+raw_acc_files_regex+'.'+suffix))
     gyr_params = np.sort(glob.glob(data_path+raw_gyr_files_regex+'.'+suffix))    
-    readAllCalibParams(acc_params, gyr_params, suffix, skew, scale, bias)
+    readAllCalibParams(acc_params, gyr_params, suffix, skew, scale, bias, gmat)
 
-plotAllCalibParams(skew, scale, bias, plot_path)
+plotAllCalibParams(skew, scale, bias, gmat, plot_path)
 #%%
 os.system('mv ' + data_path + '/*.png' +' ' + plot_path)

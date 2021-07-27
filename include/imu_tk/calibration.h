@@ -90,8 +90,13 @@ public:
   CalibratedTriad_( const _T &mis_yz = _T(0), const _T &mis_zy = _T(0), const _T &mis_zx = _T(0), 
                     const _T &mis_xz = _T(0), const _T &mis_xy = _T(0), const _T &mis_yx = _T(0), 
                     const _T &s_x = _T(1),    const _T &s_y = _T(1),    const _T &s_z = _T(1), 
-                    const _T &b_x = _T(0),    const _T &b_y = _T(0),    const _T &b_z  = _T(0) );
- 
+                    const _T &b_x = _T(0),    const _T &b_y = _T(0),    const _T &b_z  = _T(0), 
+
+                    const _T &g_xx = _T(0), const _T &g_xy = _T(0), const _T &g_xz = _T(0), 
+                    const _T &g_yx = _T(0), const _T &g_yy = _T(0), const _T &g_yz = _T(0), 
+                    const _T &g_zx = _T(0), const _T &g_zy = _T(0), const _T &g_zz = _T(0) 
+                    );
+
   ~CalibratedTriad_(){};
                
   inline _T misYZ() const { return -mis_mat_(0,1); };
@@ -109,36 +114,43 @@ public:
   inline _T biasY() const { return bias_vec_(1); };
   inline _T biasZ() const { return bias_vec_(2); };
   
+  inline _T gXX() const { return g_mat_(0,0); };
+  inline _T gXY() const { return g_mat_(0,1); };
+  inline _T gXZ() const { return g_mat_(0,2); };
+  
+  inline _T gYX() const { return g_mat_(1,0); };
+  inline _T gYY() const { return g_mat_(1,1); };
+  inline _T gYZ() const { return g_mat_(1,2); };
+  
+  inline _T gZX() const { return g_mat_(2,0); };
+  inline _T gZY() const { return g_mat_(2,1); };
+  inline _T gZZ() const { return g_mat_(2,2); };
+
+
   inline const Eigen::Matrix< _T, 3 , 3>& getMisalignmentMatrix() const { return mis_mat_; };
   inline const Eigen::Matrix< _T, 3 , 3>& getScaleMatrix() const { return scale_mat_; };
   inline const Eigen::Matrix< _T, 3 , 1>& getBiasVector() const { return bias_vec_; };
+  inline const Eigen::Matrix< _T, 3 , 3>& getGMatrix() const { return g_mat_; };
     
   inline void setScale( const Eigen::Matrix< _T, 3 , 1> &s_vec ) 
   { 
     scale_mat_(0,0) = s_vec(0); scale_mat_(1,1) = s_vec(1);  scale_mat_(2,2) = s_vec(2); 
-    update();
+    ms_mat_ = mis_mat_*scale_mat_;
   };
   
   inline void setBias( const Eigen::Matrix< _T, 3 , 1> &b_vec ) 
   { 
     bias_vec_ = b_vec;
-    update();
+    ms_mat_ = mis_mat_*scale_mat_;
   };
-  
-  /** @brief Load the calibration parameters from a simple text file.
-   * 
-   * The file should containts a sequence of two, space separated 3X3 matrixes 
-   * (the misalignment and the scale matrix) followed by a 3x1 biases vector (see the load()
-   * function)
-   */
-  bool load( std::string filename );
   
   /** @brief Save the calibration parameters in a simple text file.
    * 
    * The file will containts a sequence of two, space separated 3X3 matrixes 
    * (the misalignment and the scale matrix) followed by a 3x1 biases vector 
    */
-  bool save( std::string filename ) const;
+  bool saveAcc( std::string filename ) const;
+  bool saveGyr( std::string filename ) const;
 
   /** @brief Normalize a raw data X by correcting the misalignment and the scale,
    *         i.e., by applying the equation  X'' = T*K*X
@@ -173,7 +185,7 @@ public:
   {
     return TriadData_<_T>( raw_data.timestamp(), unbiasNormalize( raw_data.data()) );
   };
-  
+    
   /** @brief Remove the biases from a raw data */
   inline Eigen::Matrix< _T, 3 , 1> unbias( const Eigen::Matrix< _T, 3 , 1> &raw_data ) const
   {
@@ -186,12 +198,26 @@ public:
     return TriadData_<_T>( raw_data.timestamp(), unbias( raw_data.data()) );
   };
   
+  /** @brief Normalize a gyro raw data gyr by removing the sensor and the acc related biases and 
+   *         correcting the misalignment and the scale, 
+   *         i.e., by applying the equation  gyr' = T*K*(gyr - B - G*acc)
+   */
+  inline Eigen::Matrix< _T, 3 , 1> unbiasUnG( const Eigen::Matrix< _T, 3 , 1> &gyr_data, const Eigen::Matrix<_T, 3, 1> &acc_data ) const
+  {
+    return gyr_data - bias_vec_ + g_mat_*acc_data; 
+  };
+  
+  /** @brief Normalize a gyro raw data X by removing the sensor and the acc related biases and 
+   *         correcting the misalignment and the scale, 
+   *         i.e., by applying the equation  gyr' = T*K*(gyr - B - G*acc)
+   */
+  inline TriadData_<_T> unbiasUnG( const TriadData_<_T> &gyr_data, const TriadData_<_T> &acc_data ) const
+  {
+    return TriadData_<_T>( gyr_data.timestamp(), unbiasUnG( gyr_data.data(), acc_data.data() ) );
+  };
+
 private:
 
-  /** @brief Update internal data (e.g., compute Misalignment * scale matrix) 
-   *         after a parameter is changed */
-  void update();
-  
   /** @brief Misalignment matrix */
   Eigen::Matrix< _T, 3 , 3> mis_mat_;
   /** @brief Scale matrix */
@@ -200,7 +226,16 @@ private:
   Eigen::Matrix< _T, 3 , 1> bias_vec_;
   /** @brief Misalignment * scale matrix */
   Eigen::Matrix< _T, 3 , 3> ms_mat_;
+  
+  /** @brief gError matrix */
+  Eigen::Matrix< _T, 3 , 3> g_mat_;
+
 };
+
+//---------------------------------------------------------------------------
+// ------------------------------- Calibration class ------------------------
+//---------------------------------------------------------------------------
+
 
 typedef CalibratedTriad_<double> CalibratedTriad;
 
@@ -314,12 +349,6 @@ public:
   /** @brief If the parameter enabled is true, verbose output is activeted  */   
   void enableVerboseOutput( bool enabled ){ verbose_output_ = enabled; };
  
-  /** @brief Enable minimization of acc biases as a second objective */
-  void enableAccBiasMin( bool enabled ){ minimizeAccBiases_ = enabled; };
-
-  /** @brief Enable minimization of gyro biases as a second objective */
-  void enableGyrBiasMin( bool enabled ){ minimizeGyrBiases_ = enabled; };
-
   /** @brief Set suffix for results files */
   void setPlotFile(std::string f){ plotFile_ = f; };
 
@@ -381,7 +410,6 @@ private:
   _T nominal_1g_norm_;
   Eigen::Matrix<_T, 3, 1> gyr_bias_bound; 
   int acc_bias_bound_multiplier_, gyr_bias_bound_multiplier_;
-  bool minimizeAccBiases_, minimizeGyrBiases_;
 };
 
 typedef MultiPosCalibration_<double> MultiPosCalibration;
@@ -394,7 +422,12 @@ template <typename _T>
   imu_tk::CalibratedTriad_<_T>::CalibratedTriad_( const _T &mis_yz, const _T &mis_zy, const _T &mis_zx, 
                                                 const _T &mis_xz, const _T &mis_xy, const _T &mis_yx, 
                                                 const _T &s_x, const _T &s_y, const _T &s_z, 
-                                                const _T &b_x, const _T &b_y, const _T &b_z )
+                                                const _T &b_x, const _T &b_y, const _T &b_z,
+
+                                                const _T &g_xx, const _T &g_xy, const _T &g_xz, 
+                                                const _T &g_yx, const _T &g_yy, const _T &g_yz, 
+                                                const _T &g_zx, const _T &g_zy, const _T &g_zz 
+                                                )
 {
   mis_mat_ <<  _T(1)   , -mis_yz  ,  mis_zy  ,
                 mis_xz ,  _T(1)   , -mis_zx  ,  
@@ -405,42 +438,17 @@ template <typename _T>
                  _T(0) ,   _T(0)  ,   s_z  ;
                     
   bias_vec_ <<  b_x , b_y , b_z ; 
+ 
+  g_mat_ << g_xx , g_xy , g_xz,  
+            g_yx , g_yy , g_yz,  
+            g_zx , g_zy , g_zz;  
+
   
-  update();
+  ms_mat_ = mis_mat_*scale_mat_;
 }
 
 template <typename _T> 
-  bool imu_tk::CalibratedTriad_<_T>::load( std::string filename )
-{
-  std::ifstream file( filename.data() );
-  if (file.is_open())
-  {
-    _T mat[9] = {0};
-    
-    for( int i=0; i<9; i++)
-      file >> mat[i];
-
-    mis_mat_ = Eigen::Map< const Eigen::Matrix< _T, 3, 3, Eigen::RowMajor> >(mat);
-      
-    for( int i=0; i<9; i++)
-      file >> mat[i];
-    
-    scale_mat_ = Eigen::Map< const Eigen::Matrix< _T, 3, 3, Eigen::RowMajor> >(mat);
-        
-    for( int i=0; i<3; i++)
-      file >> mat[i];
-    
-    bias_vec_ = Eigen::Map< const Eigen::Matrix< _T, 3, 1> >(mat);    
-    
-    update();
-    
-    return true;
-  }
-  return false;  
-}
-
-template <typename _T> 
-  bool imu_tk::CalibratedTriad_<_T>::save( std::string filename ) const
+  bool imu_tk::CalibratedTriad_<_T>::saveAcc( std::string filename ) const
 {
   std::ofstream file( filename.data() );
   if (file.is_open())
@@ -448,15 +456,24 @@ template <typename _T>
     file<<mis_mat_<<std::endl<<std::endl
         <<scale_mat_<<std::endl<<std::endl
         <<bias_vec_<<std::endl<<std::endl;
-    
     return true;
   }
   return false;  
 }
 
-template <typename _T> void imu_tk::CalibratedTriad_<_T>::update()
+template <typename _T> 
+  bool imu_tk::CalibratedTriad_<_T>::saveGyr( std::string filename ) const
 {
-  ms_mat_ = mis_mat_*scale_mat_;
+  std::ofstream file( filename.data() );
+  if (file.is_open())
+  {
+    file<<mis_mat_<<std::endl<<std::endl
+        <<scale_mat_<<std::endl<<std::endl
+        <<bias_vec_<<std::endl<<std::endl
+        <<g_mat_<<std::endl<<std::endl;
+    return true;
+  }
+  return false;  
 }
 
 template <typename _T> std::ostream& imu_tk::operator<<(std::ostream& os, 
@@ -468,5 +485,7 @@ template <typename _T> std::ostream& imu_tk::operator<<(std::ostream& os,
   os<<calib_triad.getScaleMatrix()<<std::endl;
   os<<"Bias Vector"<<std::endl;
   os<<calib_triad.getBiasVector()<<std::endl;
+  os << "G matrix" << std::endl;
+  os << calib_triad.getGMatrix()<<std::endl;
   return os;
 }
