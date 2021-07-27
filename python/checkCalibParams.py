@@ -64,8 +64,6 @@ for acc, gyr in zip(acc_files, gyr_files):
                '--gyr_file='+gyr, 
                '--suffix='+suffix,
                '--opt_gyr_b=false',
-               '--min_acc_b=false',
-               '--min_gyr_b=false'
                ]
     print(command)
     subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -88,38 +86,12 @@ for acc, gyr in zip(acc_files, gyr_files):
                '--acc_file='+acc, 
                '--gyr_file='+gyr, 
                '--suffix='+suffix,
-               '--min_acc_b=false',
-               '--min_gyr_b=false',
                '--opt_gyr_b=true',
                '--max_iter=500'
                ]
     print(command)
     subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-#%% Perform calibrations on the files
-suffix = 'minAccBiases'
-
-for acc, gyr in zip(acc_files, gyr_files):
-    acc_params = acc+'.'+suffix
-    gyr_params = gyr+'.'+suffix
-    
-    # skip if these were already performed
-    if(os.path.isfile(acc_params) and os.path.isfile(gyr_params)):
-        print('already calculated ' + acc_params + ' and ' + gyr_params)
-        continue
-
-    print(acc, gyr)
-
-    command = [imu_tk2_app,
-               '--acc_file='+acc, 
-               '--gyr_file='+gyr, 
-               '--suffix='+suffix,
-               '--opt_gyr_b=false',
-               '--min_acc_b=true',
-               '--min_gyr_b=false'
-               ]
-    print(command)
-    subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 #%% Read the parameters and plot them
 from utils import readAllCalibParams, plotAllCalibParams
 
@@ -128,7 +100,7 @@ scale = dict()
 bias = dict()
 gmat = dict()
 
-suffixes = ['base', 'optGyrBias', 'minAccBiases'] 
+suffixes = ['base', 'optGyrBias'] 
 
 for suffix in suffixes:
     # get the name of all param files in the folder

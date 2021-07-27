@@ -279,7 +279,49 @@ def align_yaxis(ax1, v1, ax2, v2):
     ax2.set_ylim(miny+dy, maxy+dy)
 
         
-        
-        
-        
+def integrateVelocities(data):
+    import numpy as np
+    from scipy.integrate import cumtrapz
+    
+    r = np.empty(data.shape)
+    
+    #copy timestamp and v0 = 0,0,0
+    r[:,0] = data[:,0]
+    r[0,1:4] = np.zeros(3)
+    
+    # integrate the data
+    r[1:, 1:4] = cumtrapz(data[:,1:4], data[:,0], axis=0)
+      
+    return r
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
         
