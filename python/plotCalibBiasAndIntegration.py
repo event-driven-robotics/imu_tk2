@@ -159,14 +159,14 @@ nbins = 30
 rwidth = 0.8
 alpha = 0.4
 
-for acc_file, gyr_file in zip(calib_acc_data.keys(), calib_gyr_data.keys()):
+for acc_file, gyr_file in zip(calib_acc_data, calib_gyr_data):
     print(acc_file, gyr_file)
     
     fig, axs = plt.subplots(3, len(suffixes), figsize=(15,15), 
                             sharex='all', 
                             sharey='all')
     
-    for i, suffix in enumerate(calib_acc_data[acc_file].keys()):
+    for i, suffix in enumerate(suffixes):
         print(i, suffix)
         
         for j, (calib_acc, calib_gyr) in enumerate(zip(
@@ -201,10 +201,10 @@ for gyr_file in calib_gyr_data.keys():
     
     print('Uncalibrated')
     orientations[gyr_file] = dict()
-    orientations[gyr_file]['uncalibrated'] = integrateOrientations(gyr_data[gyr_file])
+    orientations[gyr_file]['uncalibrated'] = integrateOrientations(gyr_data[gyr_file], nominal_gyr_scale)
     
-    for i, suffix in enumerate(calib_gyr_data[gyr_file].keys()):
-        print(i, suffix)
+    for suffix in suffixes:
+        print(suffix)
         orientations[gyr_file][suffix] = []
         
         for j, calib_gyr in enumerate(calib_gyr_data[gyr_file][suffix]):
@@ -223,7 +223,7 @@ alpha = 0.4
 
 lab = ['x', 'y', 'z']
 
-for gyr_file in orientations.keys():
+for gyr_file in orientations:
     print(gyr_file)
     
     fig, axs = plt.subplots(3, len(suffixes), figsize=(15,15), sharex='all', sharey='row')
@@ -260,7 +260,7 @@ T_imu2mdg = np.array( [ [0, 0, 1], [0, -1, 0], [1, 0, 0] ] )
 gcomp_acc_data = dict()
 
 # apply gravity comp on uncalibrated data
-for acc_file, gyr_file in zip(acc_data.keys(), gyr_data.keys()):
+for acc_file, gyr_file in zip(acc_data, gyr_data):
     gcomp_acc_data[acc_file] = gravity_compensate(
             acc_data[acc_file][:,0],
             acc_data[acc_file][:,1:4]*nominal_acc_scale,
@@ -272,11 +272,11 @@ for acc_file, gyr_file in zip(acc_data.keys(), gyr_data.keys()):
 T_imu2mdg = np.array( [ [0, 0, 1], [0, -1, 0], [1, 0, 0] ] )
 gcomp_calib_acc_data = dict()
 
-for acc_file, gyr_file in zip(calib_acc_data.keys(), calib_gyr_data.keys()):
+for acc_file, gyr_file in zip(calib_acc_data, calib_gyr_data):
     print(acc_file, gyr_file)
     gcomp_calib_acc_data[acc_file] = dict()
     
-    for i, suffix in enumerate(calib_acc_data[acc_file].keys()):
+    for i, suffix in enumerate(suffixes):
         print(i, suffix)
         
         gcomp_calib_acc_data[acc_file][suffix] = list()
@@ -303,7 +303,7 @@ from utils import integrateVelocities
 start_time = 10;
 velocities= dict()
 
-for acc_file in gcomp_calib_acc_data.keys():
+for acc_file in gcomp_calib_acc_data:
     print(acc_file)
     velocities[acc_file] = dict()
     
@@ -311,8 +311,8 @@ for acc_file in gcomp_calib_acc_data.keys():
     velocities[acc_file]['uncalibrated'] = integrateVelocities(
             gcomp_acc_data[acc_file][idx,:])
     
-    for i, suffix in enumerate(gcomp_calib_acc_data[acc_file].keys()):
-        print(i, suffix)
+    for suffix in suffixes:
+        print(suffix)
         
         velocities[acc_file][suffix] = []
         
@@ -329,7 +329,7 @@ for acc_file in gcomp_calib_acc_data.keys():
 #%% Plot the gravity compensated accelerations
 
 from matplotlib import pyplot as plt
-from utils import align_yaxis
+#from utils import align_yaxis
  
 plt.close('all')
 
@@ -337,7 +337,7 @@ alpha = 0.4
 lab = ['x', 'y', 'z']
 start_time = 10;
 
-for acc_file in velocities.keys():
+for acc_file in velocities:
     print(acc_file)
     
     fig, axs = plt.subplots(3, len(suffixes), 
@@ -346,18 +346,16 @@ for acc_file in velocities.keys():
                             sharey='row'
                             )
     
-    # Plot the uncalibrated data
-    for i in range(len(suffixes)):
+    for i, suffix in enumerate(suffixes):
+        print(i, suffix)
+        # Plot the uncalibrated data
         for k in range(3):
             v = velocities[acc_file]['uncalibrated']
             axs[k][i].plot(v[:,0], v[:,k+1], ls=':', label='uncalibrated')
             
             axs[k][i].axhline(y=0, c='k', ls='--', label='reference')
     
-    #plot the calibrated ones        
-    for i, suffix in enumerate(suffixes):
-        print(i, suffix)
-        
+        #plot the calibrated ones                
         for j, v in enumerate(velocities[acc_file][suffix]):
             print('calib run '+str(j))
             

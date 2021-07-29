@@ -188,7 +188,7 @@ def calibrate(data, skew, scale, bias, gmat = [], other_data = []):
 
     return calib_data      
         
-def integrateOrientations(gyr):
+def integrateOrientations(gyr, scale=1):
     from pyquaternion import Quaternion
     from quaternion import rotation
     
@@ -205,7 +205,7 @@ def integrateOrientations(gyr):
     q = Quaternion()
     
     for i, (dt, w) in enumerate(zip(dts, gyr[:,1:4])):
-        q.integrate(w, dt)
+        q.integrate(w*scale, dt)
         rot = rotation.from_matrix(q.rotation_matrix)
         #print(w,' - ',  q.angle, ' - ',  q)
         #print(rot.as_euler('xyz') , '\n-------\n')
@@ -294,10 +294,18 @@ def integrateVelocities(data):
       
     return r
     
+def setBoxColors(bp, c):
+    from matplotlib import pyplot as plt
+    plt.setp(bp['boxes'][:], color=c)
+    plt.setp(bp['caps'][:], color=c)
+    plt.setp(bp['whiskers'][:], color=c)
+    plt.setp(bp['medians'][:], color=c)
+    plt.setp(bp['fliers'][:], color=c)
 
 
-
-
+def cropTime(data, start, end):
+    idx = np.logical_and(data[:,0] >= start, data[:,0] <= end)
+    return data[idx,:]
 
 
 

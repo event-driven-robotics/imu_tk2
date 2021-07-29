@@ -38,6 +38,9 @@ nominal_gyr_scale = 250 * np.pi / (2.0 * 180.0 * 16384.0)
 nominal_acc_scale = g_mag/16384.0
 suffixes = ['base', 'optGyrBias'] 
 
+start_time = 10
+end_time = 100
+
 #%% get raw data files
 
 acc_files = np.sort(glob.glob(data_path+raw_acc_files_regex))
@@ -113,145 +116,35 @@ for acc, gyr in zip(acc_files, gyr_files):
 
         calib_acc_data[acc][suffix] = temp_acc
         calib_gyr_data[gyr][suffix] = temp_gyr
-    
-#%% Plot the norm of the acc for the calibrated data
-from matplotlib import pyplot as plt
-from utils import num2leg
-
-plt.close('all')
-
-nbins = 30
-rwidth = 0.8
-alpha = 0.4
-
-for acc_file, gyr_file in zip(calib_acc_data.keys(), calib_gyr_data.keys()):
-    print(acc_file, gyr_file)
-    
-    fig, axs = plt.subplots(1, len(suffixes), figsize=(15,5), sharex='all')
-    
-    for i, suffix in enumerate(calib_acc_data[acc_file].keys()):
-        print(i, suffix)
-        
-        for j, (calib_acc, calib_gyr) in enumerate(zip(
-                calib_acc_data[acc_file][suffix],
-                calib_gyr_data[gyr_file][suffix]
-                )):
-            print('calib run '+str(j))
-            norm_acc = np.linalg.norm(calib_acc[:,1:4], axis=1)
-            lab = r'avg='+num2leg(norm_acc.mean()) + ' $\pm$ '+num2leg(norm_acc.std())
-            axs[i].hist(norm_acc, bins=nbins, alpha=alpha, rwidth=rwidth, label=lab)
-        axs[i].legend(prop={'size':8});
-        axs[i].set_xlabel('||acc||')
-        axs[i].set_ylabel('# occurences')
-        axs[i].title.set_text(suffix)
-        axs[i].axvline(x=g_mag, c='k', ls='--')
-    plt.savefig(plot_path+'/'+acc_file.split('/')[-1]+'_gnorm.png')
-    #input('wait')
-
-
-#%% Plot Calibrated Gyro biases
-from matplotlib import pyplot as plt
-from utils import num2leg
-
-plt.close('all')
-
-nbins = 30
-rwidth = 0.8
-alpha = 0.4
-
-for acc_file, gyr_file in zip(calib_acc_data.keys(), calib_gyr_data.keys()):
-    print(acc_file, gyr_file)
-    
-    fig, axs = plt.subplots(3, len(suffixes), figsize=(15,15), 
-                            sharex='all', 
-                            sharey='all')
-    
-    for i, suffix in enumerate(calib_acc_data[acc_file].keys()):
-        print(i, suffix)
-        
-        for j, (calib_acc, calib_gyr) in enumerate(zip(
-                calib_acc_data[acc_file][suffix],
-                calib_gyr_data[gyr_file][suffix]
-                )):
-            print('calib run '+str(j))
-            
-            for k in range(3):
-                lab = r'avg='+num2leg(calib_gyr[:,k+1].mean()) +' $\pm$ '+ num2leg(calib_gyr[:,k+1].std())
-                
-                axs[k][i].hist(calib_gyr[:,k+1], alpha=alpha, label=lab)
-                axs[k][i].legend(prop={'size':8});
-                axs[k][i].set_ylabel('# occurences')
-                axs[k][i].set_xlabel('Ang. Vel. (radians/s)')
-                axs[k][i].title.set_text(suffix)
-        
-        for k in range(3):
-            axs[k][i].axvline(x=0, ls='--', c='k')
-            
-    plt.savefig(plot_path+'/'+acc_file.split('/')[-1]+'_static_gyro_biases.png')
-    #input('wait')
 
 #%% Compute the orientation from the angular velocities
-    
-from utils import integrateOrientations
+from utils import integrateOrientations, cropTime
 
 orientations = dict()
 
-for gyr_file in calib_gyr_data.keys():
+for gyr_file in calib_gyr_data:
     print(gyr_file)
     
     print('Uncalibrated')
     orientations[gyr_file] = dict()
-    orientations[gyr_file]['uncalibrated'] = integrateOrientations(gyr_data[gyr_file])
     
-    for i, suffix in enumerate(calib_gyr_data[gyr_file].keys()):
-        print(i, suffix)
+    #limit integration time for having some consistency among benchmarks
+    
+    orientations[gyr_file]['uncalibrated'] = integrateOrientations(
+            cropTime(gyr_data[gyr_file], start_time, end_time),
+            nominal_gyr_scale)
+
+    for suffix in suffixes:
+        print(suffix)
         orientations[gyr_file][suffix] = []
         
         for j, calib_gyr in enumerate(calib_gyr_data[gyr_file][suffix]):
             print('Calibrated run '+str(j))
-            orientations[gyr_file][suffix].append(integrateOrientations(calib_gyr))
+            orientations[gyr_file][suffix].append(
+                    integrateOrientations(cropTime(calib_gyr, start_time, end_time))
+                    )
         
-        orientations[gyr_file][suffix] = np.array(orientations[gyr_file][suffix])
-
-#%% Plot orientation obtained from integrating angular velocities for the calibrated data
-        
-from matplotlib import pyplot as plt
-
-plt.close('all')
-
-alpha = 0.4
-
-lab = ['x', 'y', 'z']
-
-for gyr_file in orientations.keys():
-    print(gyr_file)
-    
-    fig, axs = plt.subplots(3, len(suffixes), figsize=(15,15), sharex='all', sharey='row')
-    
-    # First Plot the uncalibrated ones
-    ori = orientations[gyr_file]['uncalibrated']
-    for i in range(len(suffixes)):
-        for k in range(3):
-                axs[k][i].plot(ori[:,0], ori[:,k+1], alpha=alpha, label='Uncalib', ls=':')
-                axs[k][i].set_xlabel('time (s)')
-                axs[k][i].set_ylabel('Angle ' + lab[k] + ' (radians)')
-       
-    # Plot the calibrated ones                  
-    for i, suffix in enumerate(suffixes):
-    
-        for j, ori in enumerate(orientations[gyr_file][suffix]):
-            print('calib run '+str(j))
-            
-            for k in range(3):
-                axs[k][i].plot(ori[:,0], ori[:,k+1], alpha=alpha, label='calib - '+str(j))
-                
-        for k in range(3):
-            axs[k][i].axhline(y=0, c='k', ls='--', label='reference')
-            axs[k][i].legend(prop={'size':8});
-                    
-            axs[0][i].title.set_text(suffix)
-    plt.savefig(plot_path+'/'+gyr_file.split('/')[-1]+'_orientation.png')
-    
+        orientations[gyr_file][suffix] = np.array(orientations[gyr_file][suffix])          
 
 #%% Apply gravity compensation with Madgwick filter
 from utils import gravity_compensate
@@ -260,7 +153,7 @@ T_imu2mdg = np.array( [ [0, 0, 1], [0, -1, 0], [1, 0, 0] ] )
 gcomp_acc_data = dict()
 
 # apply gravity comp on uncalibrated data
-for acc_file, gyr_file in zip(acc_data.keys(), gyr_data.keys()):
+for acc_file, gyr_file in zip(acc_data, gyr_data):
     gcomp_acc_data[acc_file] = gravity_compensate(
             acc_data[acc_file][:,0],
             acc_data[acc_file][:,1:4]*nominal_acc_scale,
@@ -272,18 +165,18 @@ for acc_file, gyr_file in zip(acc_data.keys(), gyr_data.keys()):
 T_imu2mdg = np.array( [ [0, 0, 1], [0, -1, 0], [1, 0, 0] ] )
 gcomp_calib_acc_data = dict()
 
-for acc_file, gyr_file in zip(calib_acc_data.keys(), calib_gyr_data.keys()):
+for acc_file, gyr_file in zip(calib_acc_data, calib_gyr_data):
     print(acc_file, gyr_file)
     gcomp_calib_acc_data[acc_file] = dict()
     
-    for i, suffix in enumerate(calib_acc_data[acc_file].keys()):
-        print(i, suffix)
+    for suffix in suffixes:
+        print(suffix)
         
         gcomp_calib_acc_data[acc_file][suffix] = list()
-        for j, (calib_acc, calib_gyr) in enumerate(zip(
+        for calib_acc, calib_gyr in zip(
                 calib_acc_data[acc_file][suffix],
                 calib_gyr_data[gyr_file][suffix]
-                )):
+                ):
             print('calib run '+str(j))
             
             gcomp_calib_acc_data[acc_file][suffix].append(
@@ -298,78 +191,234 @@ for acc_file, gyr_file in zip(calib_acc_data.keys(), calib_gyr_data.keys()):
         gcomp_calib_acc_data[acc_file][suffix] = np.array(gcomp_calib_acc_data[acc_file][suffix])
         
 #%% Integrate the acc to get the velocities
-from utils import integrateVelocities
+from utils import integrateVelocities, cropTime
 
-start_time = 10;
 velocities= dict()
 
-for acc_file in gcomp_calib_acc_data.keys():
+for acc_file in gcomp_calib_acc_data:
     print(acc_file)
     velocities[acc_file] = dict()
     
-    idx = gcomp_acc_data[acc_file][:,0] >= start_time
     velocities[acc_file]['uncalibrated'] = integrateVelocities(
-            gcomp_acc_data[acc_file][idx,:])
+            cropTime(gcomp_acc_data[acc_file],start_time, end_time))
     
-    for i, suffix in enumerate(gcomp_calib_acc_data[acc_file].keys()):
-        print(i, suffix)
+    for suffix in suffixes:
+        print(suffix)
         
         velocities[acc_file][suffix] = []
         
         for j, (calib_acc) in enumerate(gcomp_calib_acc_data[acc_file][suffix]):
             print('calib run '+str(j))
             
-            idx = calib_acc[:,0] >= start_time
             velocities[acc_file][suffix].append(
-                    integrateVelocities(calib_acc[idx,:]))
+                    integrateVelocities(cropTime(calib_acc, start_time, end_time)))
                     
         velocities[acc_file][suffix] = np.array(
                 velocities[acc_file][suffix])
-        
-#%% Plot the gravity compensated accelerations
 
+#%% Caculate the errors of the calibrations
+from numpy.linalg import norm
+
+errors_gyr = dict()
+#TODO: make a function to get the error every a time interval
+    
+for gyr_file in calib_gyr_data:
+    print(gyr_file)
+    
+    print('Uncalibrated')
+    errors_gyr[gyr_file] = dict()
+    errors_gyr[gyr_file]['uncalibrated'] = norm(orientations[gyr_file]['uncalibrated'][-1,1:4])
+    
+    for suffix in suffixes:
+        print(suffix)
+        errors_gyr[gyr_file][suffix] = []
+        
+        for ori in orientations[gyr_file][suffix]:
+            errors_gyr[gyr_file][suffix].append(norm(ori[-1,1:4]))
+        
+        errors_gyr[gyr_file][suffix] = np.array(errors_gyr[gyr_file][suffix])    
+        
+        
+errors_acc = dict()
+
+for acc_file in gcomp_calib_acc_data:
+    print(acc_file)
+    errors_acc[acc_file] = dict()
+    
+    errors_acc[acc_file]['uncalibrated'] = norm(velocities[acc_file]['uncalibrated'][-1,1:4])
+    
+    for suffix in suffixes:
+        print(suffix)
+        
+        errors_acc[acc_file][suffix] = []
+        
+        for vel in velocities[acc_file][suffix]:
+            errors_acc[acc_file][suffix].append(norm(vel[-1,1:4]))
+                    
+        errors_acc[acc_file][suffix] = np.array(errors_acc[acc_file][suffix])        
+        
+#%% Plot a scatter
+import re
 from matplotlib import pyplot as plt
-from utils import align_yaxis
- 
+from matplotlib.lines import Line2D as mlines
+from matplotlib.patches import Patch as mpatches
+
 plt.close('all')
 
-alpha = 0.4
-lab = ['x', 'y', 'z']
-start_time = 10;
+alpha = 1
+mss = ['s','x']
+plt.figure(figsize=(20,20))
 
-for acc_file in velocities.keys():
-    print(acc_file)
-    
-    fig, axs = plt.subplots(3, len(suffixes), 
-                            figsize=(20,20), 
-                            sharex='all', 
-                            sharey='row'
-                            )
-    
-    # Plot the uncalibrated data
-    for i in range(len(suffixes)):
-        for k in range(3):
-            v = velocities[acc_file]['uncalibrated']
-            axs[k][i].plot(v[:,0], v[:,k+1], ls=':', label='uncalibrated')
-            
-            axs[k][i].axhline(y=0, c='k', ls='--', label='reference')
+for acc_file, gyr_file in zip(errors_acc, errors_gyr):
+    print(acc_file, gyr_file)
+        
+    plt.plot(abs(errors_acc[acc_file]['uncalibrated']),
+             abs(errors_gyr[gyr_file]['uncalibrated']),
+             marker='d')
     
     #plot the calibrated ones        
-    for i, suffix in enumerate(suffixes):
-        print(i, suffix)
+    for suffix, ms in zip(suffixes, mss):
+        print(suffix)
         
-        for j, v in enumerate(velocities[acc_file][suffix]):
-            print('calib run '+str(j))
+        for ea, eg in zip(errors_acc[acc_file][suffix], errors_gyr[gyr_file][suffix]):
+            lab = re.findall(r'\d+', acc_file.split('/')[-1])[0]
+            plt.plot(abs(ea), abs(eg), alpha=alpha, marker=ms)
+            plt.annotate(lab, (abs(ea), abs(eg)))
             
-            for k in range(3):
-                axs[k][i].plot(v[:,0], v[:,k+1], alpha=alpha, label='calib - '+str(j))
+plt.xlabel('|Orientation error|')
+plt.ylabel('|Lin. Velocity error|')
+
+l0 = mlines([],[], marker='d', ls='', label='uncalibrated')
+l1 = mlines([],[], marker='s', ls='', label= suffixes[0])
+l2 = mlines([],[], marker='x', ls='', label= suffixes[1])
+handles1 = [l0,l1,l2]
+legend1 = plt.legend(handles=handles1, prop={'size':12});
+
+colours = plt.rcParams['axes.prop_cycle'].by_key()['color']
+handles2 = []
+for i, file in enumerate(acc_params):
+    handles2.append(mpatches(color=colours[i], label='trial '+re.findall(r'\d+', file.split('/')[-1])[0]))
             
-        for k in range(3):
-            axs[k][i].set_xlabel('time (s)')
-            axs[k][i].set_ylabel('Vel ' + lab[k] + ' (m/s)')
-            axs[k][i].legend(prop={'size':8});
-            
-        axs[0][i].title.set_text(suffix)
-            
-    plt.savefig(plot_path+'/'+acc_file.split('/')[-1]+'_velocities.png')
-    #break
+plt.legend(handles=handles2, loc=4)
+plt.gca().add_artist(legend1)
+plt.yscale('log')
+plt.xscale('log')
+plt.savefig(plot_path+'/errors.png')
+          
+#%% Per calibration trial average
+from utils import setBoxColors
+perCalib_acc_error = dict()
+perCalib_gyr_error = dict()
+
+trials = ['#'+re.findall(r'\d+', file.split('/')[-1])[0] for file in acc_params]
+pos = 3*(np.linspace(1,len(trials),len(trials))-1)
+colours = plt.rcParams['axes.prop_cycle'].by_key()['color']
+
+plt.close('all')
+fig, ax = plt.subplots(1, 2, figsize=(20,10))#, sharex='all', sharey='all')
+
+for i, suffix in enumerate(suffixes):
+    print(i)
+    perCalib_acc_error[suffix] = []
+    perCalib_gyr_error[suffix] = []
+    
+    for acc_file, gyr_file in zip(errors_acc, errors_gyr):    
+        perCalib_acc_error[suffix].append(errors_acc[acc_file][suffix])
+        perCalib_gyr_error[suffix].append(errors_gyr[gyr_file][suffix])
+    
+    perCalib_acc_error[suffix] = np.array(perCalib_acc_error[suffix])
+    perCalib_gyr_error[suffix] = np.array(perCalib_gyr_error[suffix])
+    bp = ax[0].boxplot(perCalib_acc_error[suffix], widths = 0.6, positions=pos+i)
+    setBoxColors(bp, colours[i])
+    bp = ax[1].boxplot(perCalib_gyr_error[suffix], widths = 0.6, positions=pos+i)
+    setBoxColors(bp, colours[i])
+
+# plot the uncalibrated data
+uncalib_acc_error = []
+uncalib_gyr_error = []
+for acc_file, gyr_file in zip(errors_acc, errors_gyr):    
+    uncalib_acc_error.append(errors_acc[acc_file]['uncalibrated'])
+    uncalib_gyr_error.append(errors_gyr[gyr_file]['uncalibrated'])
+uncalib_acc_error = np.array(uncalib_acc_error)
+uncalib_gyr_error = np.array(uncalib_gyr_error)
+    
+bp = ax[0].boxplot(uncalib_acc_error, widths = 0.6, positions=[-1])
+setBoxColors(bp, 'k')
+bp = ax[1].boxplot(uncalib_gyr_error, widths = 0.6, positions=[-1])
+setBoxColors(bp, 'k')
+
+
+plt.sca(ax[0])
+plt.xticks( np.concatenate(([-1],pos+0.5)), ['uncalib']+trials)  
+ax[0].set_xlabel('calibration trial')   
+ax[0].set_ylabel('lin. vel. error')
+
+ax[1].set_xticks(pos+0.5, trials)     
+ax[1].set_xlabel('calibration trial')   
+ax[1].set_ylabel('ori. error')     
+
+handles = []
+for i, suffix in enumerate(suffixes):
+    handles.append(mpatches(color=colours[i], label=suffix))
+ax[1].legend(handles=handles)    
+
+fig.savefig(plot_path + 'compare_calibration_trials.pdf')
+
+#%% Per calibration more (suffix) average
+from utils import setBoxColors
+perCalib_acc_error = dict()
+perCalib_gyr_error = dict()
+
+trials = ['#'+re.findall(r'\d+', file.split('/')[-1])[0] for file in acc_params]
+pos = 3*(np.linspace(1,len(trials),len(trials))-1)
+colours = plt.rcParams['axes.prop_cycle'].by_key()['color']
+
+plt.close('all')
+fig, ax = plt.subplots(1, 2, figsize=(20,10))#, sharex='all', sharey='all')
+
+for i, suffix in enumerate(suffixes):
+    print(i)
+    perCalib_acc_error[suffix] = []
+    perCalib_gyr_error[suffix] = []
+    
+    for acc_file, gyr_file in zip(errors_acc, errors_gyr):    
+        perCalib_acc_error[suffix].append(errors_acc[acc_file][suffix])
+        perCalib_gyr_error[suffix].append(errors_gyr[gyr_file][suffix])
+    
+    perCalib_acc_error[suffix] = np.array(perCalib_acc_error[suffix])
+    perCalib_gyr_error[suffix] = np.array(perCalib_gyr_error[suffix])
+    bp = ax[0].boxplot(perCalib_acc_error[suffix], widths = 0.6, positions=pos+i)
+    setBoxColors(bp, colours[i])
+    bp = ax[1].boxplot(perCalib_gyr_error[suffix], widths = 0.6, positions=pos+i)
+    setBoxColors(bp, colours[i])
+
+# plot the uncalibrated data
+uncalib_acc_error = []
+uncalib_gyr_error = []
+for acc_file, gyr_file in zip(errors_acc, errors_gyr):    
+    uncalib_acc_error.append(errors_acc[acc_file]['uncalibrated'])
+    uncalib_gyr_error.append(errors_gyr[gyr_file]['uncalibrated'])
+uncalib_acc_error = np.array(uncalib_acc_error)
+uncalib_gyr_error = np.array(uncalib_gyr_error)
+    
+bp = ax[0].boxplot(uncalib_acc_error, widths = 0.6, positions=[-1])
+setBoxColors(bp, 'k')
+bp = ax[1].boxplot(uncalib_gyr_error, widths = 0.6, positions=[-1])
+setBoxColors(bp, 'k')
+
+
+plt.sca(ax[0])
+plt.xticks( np.concatenate(([-1],pos+0.5)), ['uncalib']+trials)  
+ax[0].set_xlabel('calibration trial')   
+ax[0].set_ylabel('lin. vel. error')
+
+ax[1].set_xticks(pos+0.5, trials)     
+ax[1].set_xlabel('calibration trial')   
+ax[1].set_ylabel('ori. error')     
+
+handles = []
+for i, suffix in enumerate(suffixes):
+    handles.append(mpatches(color=colours[i], label=suffix))
+ax[1].legend(handles=handles)    
+
+fig.savefig(plot_path + 'compare_calibration_modes.pdf')
