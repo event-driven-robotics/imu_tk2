@@ -231,7 +231,7 @@ for gyr_file in orientations:
     fig, axs = plt.subplots(3, len(suffixes), figsize=(15,15), sharex='all', sharey='row')
     
     # First Plot the uncalibrated ones
-    ori = MakeOrientationContinuous(orientations[gyr_file]['uncalibrated'])
+    ori = (orientations[gyr_file]['uncalibrated'])
     for i in range(len(suffixes)):
         for k in range(3):
                 axs[k][i].plot(ori[:,0], ori[:,k+1], alpha=alpha, label='Uncalib', ls=':')
@@ -243,7 +243,7 @@ for gyr_file in orientations:
     
         for j, orientation in enumerate(orientations[gyr_file][suffix]):
             print('calib run '+str(j))
-            ori = MakeOrientationContinuous(orientation)
+            ori = (orientation)
             for k in range(3):
                 axs[k][i].plot(ori[:,0], ori[:,k+1], alpha=alpha, label='calib - '+str(j))
                 
@@ -367,7 +367,7 @@ for acc_file in velocities:
         for k in range(3):
             axs[k][i].set_xlabel('time (s)')
             axs[k][i].set_ylabel('Vel ' + lab[k] + ' (m/s)')
-            axs[k][i].legend(prop={'size':8});
+            axs[k][i].legend(prop={'size':8}, loc=6);
             
         axs[0][i].title.set_text(suffix)
             

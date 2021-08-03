@@ -299,8 +299,9 @@ legend1 = plt.legend(handles=handles1, prop={'size':12});
 
 colours = plt.rcParams['axes.prop_cycle'].by_key()['color']
 handles2 = []
+
 for i, file in enumerate(acc_params):
-    handles2.append(mpatches(color=colours[i], label='trial '+re.findall(r'\d+', file.split('/')[-1])[0]))
+    handles2.append(mpatches(color=colours[i], label='calib trial '+re.findall(r'\d+', file.split('/')[-1])[0]))
             
 plt.legend(handles=handles2, loc=4)
 plt.gca().add_artist(legend1)
