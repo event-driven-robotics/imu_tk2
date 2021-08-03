@@ -216,6 +216,7 @@ for gyr_file in calib_gyr_data.keys():
 #%% Plot orientation obtained from integrating angular velocities for the calibrated data
         
 from matplotlib import pyplot as plt
+from utils import MakeOrientationContinuous
 
 plt.close('all')
 
@@ -229,7 +230,7 @@ for gyr_file in orientations:
     fig, axs = plt.subplots(3, len(suffixes), figsize=(15,15), sharex='all', sharey='row')
     
     # First Plot the uncalibrated ones
-    ori = orientations[gyr_file]['uncalibrated']
+    ori = MakeOrientationContinuous(orientations[gyr_file]['uncalibrated'])
     for i in range(len(suffixes)):
         for k in range(3):
                 axs[k][i].plot(ori[:,0], ori[:,k+1], alpha=alpha, label='Uncalib', ls=':')
@@ -239,9 +240,9 @@ for gyr_file in orientations:
     # Plot the calibrated ones                  
     for i, suffix in enumerate(suffixes):
     
-        for j, ori in enumerate(orientations[gyr_file][suffix]):
+        for j, orientation in enumerate(orientations[gyr_file][suffix]):
             print('calib run '+str(j))
-            
+            ori = MakeOrientationContinuous(orientation)
             for k in range(3):
                 axs[k][i].plot(ori[:,0], ori[:,k+1], alpha=alpha, label='calib - '+str(j))
                 
@@ -326,8 +327,8 @@ for acc_file in gcomp_calib_acc_data:
         velocities[acc_file][suffix] = np.array(
                 velocities[acc_file][suffix])
         
-#%% Plot the gravity compensated accelerations
-
+#%% Plot the linear velocities
+        
 from matplotlib import pyplot as plt
 #from utils import align_yaxis
  

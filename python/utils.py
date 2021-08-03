@@ -203,14 +203,14 @@ def integrateOrientations(gyr, scale=1):
     assert len(dts)==len(gyr)
         
     q = Quaternion()
+    rots = np.empty((len(dts), 4))
     
     for i, (dt, w) in enumerate(zip(dts, gyr[:,1:4])):
         q.integrate(w*scale, dt)
-        rot = rotation.from_matrix(q.rotation_matrix)
-        #print(w,' - ',  q.angle, ' - ',  q)
-        #print(rot.as_euler('xyz') , '\n-------\n')
-        ret[i,1:4] = rot.as_euler('xyz')
-        
+        rots[i,:] = q.elements
+    
+    rot = rotation.from_wxyz_quat(rots)
+    ret[:,1:4] = rot.as_euler('xyz')
     return ret
         
 def num2leg(n, p=3):
@@ -308,15 +308,49 @@ def cropTime(data, start, end):
     return data[idx,:]
 
 
-
-
-
-
-
-
-
-
-
+def MakeOrientationContinuous(data):
+    import numpy as np
+    #allocate and copy initial values
+    ret = data.copy()
+    
+    it = 1
+    
+    swaps = np.logical_and(ret[1:,1:4] * ret[:-1,1:4] < 0, np.abs(ret[1:,1:4]) > np.pi/2)
+    swaps = np.concatenate( ([[False, False, False]], swaps) )
+    #print(np.any(swaps), len(np.unique(swaps)))
+          
+    while(np.any(swaps)):
+        for k in range(3):
+            swapIdx = np.where(swaps[:,k])[0]
+            
+            if len(swapIdx) % 2 == 1:
+                swapIdx = np.append(swapIdx, (len(data) - 1))
+            
+            #if k == 0: print('swapIdx: ', swapIdx)
+            
+            for idx in range(0, len(swapIdx), 2):
+                i = swapIdx[idx]
+                j = swapIdx[idx+1]
+                
+                v0 = ret[i-1, k+1]
+            
+                #if k == 0: print('\n-----------\nbefore:\n', ret[i-1], '\n', ret[i], v0)
+                if v0 > 0:
+                    ret[i:j,k+1] += 2*np.pi*it
+                    #if k == 0: print('+ 2pi')
+                else:
+                    ret[i:j,k+1] -= 2*np.pi*it
+                    #if k == 0: print('- 2pi')
+                #if k == 0: print('after :\n', ret[i-1], '\n', ret[i])
+        
+        ret = ret[:-1,:]
+        it += 1
+        swaps = np.logical_and(ret[1:,1:4] * ret[:-1,1:4] < 0, np.abs(ret[1:,1:4]) > np.pi/2)
+        swaps = np.concatenate( ([[False, False, False]], swaps) )
+        #print('##################################################', np.any(swaps), np.unique(swaps))
+        #input('wait')
+        #break
+    return ret
 
 
 
