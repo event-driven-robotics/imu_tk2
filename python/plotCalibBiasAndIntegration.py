@@ -20,6 +20,7 @@ imu_tk2_path = '/home/leandro/repos/tools/imu_tk'
 imu_tk2_app = imu_tk2_path+'/bin/test_imu_calib'
 data_path = '/home/leandro/results/IMUDataDump'
 plot_path = data_path+'/plots'
+params_path = data_path+'/params'
 
 sys.path.insert(0, repos_path)
 sys.path.insert(0, bimvee_path)
@@ -30,8 +31,8 @@ if(not os.path.isdir(plot_path)):
     print('creating folder for plots')
     os.mkdir(plot_path)
     
-raw_acc_files_regex = '/static_acc[0-9][0-9]'
-raw_gyr_files_regex = '/static_gyr[0-9][0-9]'
+raw_acc_files_regex = '/test/acc[0-9][0-9]'
+raw_gyr_files_regex = '/test/gyr[0-9][0-9]'
 
 g_mag = 9.805622
 nominal_gyr_scale = 250 * np.pi / (2.0 * 180.0 * 16384.0)
@@ -62,8 +63,8 @@ for suffix in suffixes:
     acc_params_regex = '/acc[0-9][0-9]'+'.'+suffix
     gyr_params_regex = '/gyr[0-9][0-9]'+'.'+suffix
     
-    acc_params = np.sort(glob.glob(data_path+acc_params_regex))
-    gyr_params = np.sort(glob.glob(data_path+gyr_params_regex))
+    acc_params = np.sort(glob.glob(params_path+acc_params_regex))
+    gyr_params = np.sort(glob.glob(params_path+gyr_params_regex))
     
     readAllCalibParams(acc_params, gyr_params, suffix, skew, scale, bias, gmat)
 
@@ -248,7 +249,7 @@ for gyr_file in orientations:
                 
         for k in range(3):
             axs[k][i].axhline(y=0, c='k', ls='--', label='reference')
-            axs[k][i].legend(prop={'size':8});
+            axs[k][i].legend(prop={'size':8}, loc=6);
                     
             axs[0][i].title.set_text(suffix)
     plt.savefig(plot_path+'/'+gyr_file.split('/')[-1]+'_orientation.png')

@@ -20,6 +20,8 @@ imu_tk2_path = '/home/leandro/repos/tools/imu_tk'
 imu_tk2_app = imu_tk2_path+'/bin/test_imu_calib'
 data_path = '/home/leandro/results/IMUDataDump'
 plot_path = data_path+'/plots'
+params_path = data_path+'/params'
+
 
 sys.path.insert(0, repos_path)
 sys.path.insert(0, bimvee_path)
@@ -30,13 +32,14 @@ if(not os.path.isdir(plot_path)):
     print('creating folder for plots')
     os.mkdir(plot_path)
     
-raw_acc_files_regex = '/dynamic_acc[0-9][0-9]'
-raw_gyr_files_regex = '/dynamic_gyr[0-9][0-9]'
+raw_acc_files_regex = '/test/acc[0-9][0-9]'
+raw_gyr_files_regex = '/test/gyr[0-9][0-9]'
 
 g_mag = 9.805622
 nominal_gyr_scale = 250 * np.pi / (2.0 * 180.0 * 16384.0)
 nominal_acc_scale = g_mag/16384.0
-suffixes = ['base', 'optGyrBias'] 
+
+suffixes = ['base', 'optGyrBias', 'accMeans'] 
 
 start_time = 10
 end_time = 100
@@ -65,8 +68,8 @@ for suffix in suffixes:
     acc_params_regex = '/acc[0-9][0-9]'+'.'+suffix
     gyr_params_regex = '/gyr[0-9][0-9]'+'.'+suffix
     
-    acc_params = np.sort(glob.glob(data_path+acc_params_regex))
-    gyr_params = np.sort(glob.glob(data_path+gyr_params_regex))
+    acc_params = np.sort(glob.glob(params_path+acc_params_regex))
+    gyr_params = np.sort(glob.glob(params_path+gyr_params_regex))
 
     readAllCalibParams(acc_params, gyr_params, suffix, skew, scale, bias, gmat)
 
@@ -225,7 +228,7 @@ for gyr_file in calib_gyr_data:
     
     print('Uncalibrated')
     errors_gyr[gyr_file] = dict()
-    ori = MakeOrientationContinuous(orientations[gyr_file]['uncalibrated'])
+    ori = (orientations[gyr_file]['uncalibrated'])
     errors_gyr[gyr_file]['uncalibrated'] = norm(ori[-1,1:4])
     
     for suffix in suffixes:
@@ -233,7 +236,7 @@ for gyr_file in calib_gyr_data:
         errors_gyr[gyr_file][suffix] = []
         
         for orientation in orientations[gyr_file][suffix]:
-            ori = MakeOrientationContinuous(orientation)
+            ori = (orientation)
             errors_gyr[gyr_file][suffix].append(norm(ori[-1,1:4]))
         
         errors_gyr[gyr_file][suffix] = np.array(errors_gyr[gyr_file][suffix])    
@@ -311,7 +314,7 @@ perCalib_acc_error = dict()
 perCalib_gyr_error = dict()
 
 trials = ['#'+re.findall(r'\d+', file.split('/')[-1])[0] for file in acc_params]
-pos = 3*(np.linspace(1,len(trials),len(trials)))-1
+pos = (len(suffixes)+1)*(np.linspace(1,len(trials),len(trials)))-1
 colours = plt.rcParams['axes.prop_cycle'].by_key()['color']
 
 plt.close('all')
@@ -371,7 +374,7 @@ perTest_acc_error = dict()
 perTest_gyr_error = dict()
 
 tests = ['#'+re.findall(r'\d+', file.split('/')[-1])[0] for file in acc_data]
-pos = 3*(np.linspace(1,len(tests),len(tests)))-1
+pos = (len(suffixes)+1)*(np.linspace(1,len(tests),len(tests)))-1
 colours = plt.rcParams['axes.prop_cycle'].by_key()['color']
 
 plt.close('all')

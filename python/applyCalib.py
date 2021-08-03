@@ -21,10 +21,15 @@ imu_tk2_path = '/home/leandro/repos/tools/imu_tk'
 imu_tk2_app = imu_tk2_path+'/bin/test_imu_calib'
 data_path = '/home/leandro/results/IMUDataDump'
 plot_path = data_path+'/plots'
+params_path = data_path+'/params'
 
 if( not os.path.isdir(plot_path)):
     print('creating folder for plots')
     os.mkdir(plot_path)
+    
+if( not os.path.isdir(params_path)):
+    print('creating folder for params')
+    os.mkdir(params_path)
     
 raw_acc_files_regex = '/acc[0-9][0-9]'
 raw_gyr_files_regex = '/gyr[0-9][0-9]'
@@ -49,9 +54,9 @@ assert acc_files.size == gyr_files.size, 'number of files for calibration should
 suffix = 'base'
 
 for acc, gyr in zip(acc_files, gyr_files):
-    acc_params = acc+'.'+suffix
-    gyr_params = gyr+'.'+suffix
-    
+    acc_params = params_path + '/' + acc.split('/')[-1] + '.'+suffix
+    gyr_params = params_path + '/' + gyr.split('/')[-1] + '.'+suffix
+
     # skip if these were already performed
     if(os.path.isfile(acc_params) and os.path.isfile(gyr_params)):
         print('already calculated ' + acc_params + ' and ' + gyr_params)
@@ -72,8 +77,8 @@ for acc, gyr in zip(acc_files, gyr_files):
 suffix = 'optGyrBias'
 
 for acc, gyr in zip(acc_files, gyr_files):
-    acc_params = acc+'.'+suffix
-    gyr_params = gyr+'.'+suffix
+    acc_params = params_path + '/' + acc.split('/')[-1] + '.'+suffix
+    gyr_params = params_path + '/' + gyr.split('/')[-1] + '.'+suffix
     
     # skip if these were already performed
     if(os.path.isfile(acc_params) and os.path.isfile(gyr_params)):
@@ -91,7 +96,38 @@ for acc, gyr in zip(acc_files, gyr_files):
                ]
     print(command)
     subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+#%% Perform calibrations on the files
+suffix = 'accMeans'
 
+for acc, gyr in zip(acc_files, gyr_files):
+    acc_params = params_path + '/' + acc.split('/')[-1] + '.'+suffix
+    gyr_params = params_path + '/' + gyr.split('/')[-1] + '.'+suffix
+    
+    # skip if these were already performed
+    if(os.path.isfile(acc_params) and os.path.isfile(gyr_params)):
+        print('already calculated ' + acc_params + ' and ' + gyr_params)
+        continue
+
+    print(acc, gyr)
+
+    command = [imu_tk2_app,
+               '--acc_file='+acc, 
+               '--gyr_file='+gyr, 
+               '--suffix='+suffix,
+               '--opt_gyr_b=true',
+               '--max_iter=500',
+               '--acc_use_means=true'
+               ]
+    print(command)
+    subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    
+#%%
+suffixes = ['base', 'optGyrBias', 'accMeans'] 
+
+os.system('mv ' + data_path + '/*.png' +' ' + plot_path)
+for suffix in suffixes:
+    os.system('mv ' + data_path + '/*.'+ suffix +' ' + params_path)
+    
 #%% Read the parameters and plot them
 from utils import readAllCalibParams, plotAllCalibParams
 
@@ -100,14 +136,11 @@ scale = dict()
 bias = dict()
 gmat = dict()
 
-suffixes = ['base', 'optGyrBias'] 
 
 for suffix in suffixes:
     # get the name of all param files in the folder
-    acc_params = np.sort(glob.glob(data_path+raw_acc_files_regex+'.'+suffix))
-    gyr_params = np.sort(glob.glob(data_path+raw_gyr_files_regex+'.'+suffix))    
+    acc_params = np.sort(glob.glob(params_path+raw_acc_files_regex+'.'+suffix))
+    gyr_params = np.sort(glob.glob(params_path+raw_gyr_files_regex+'.'+suffix))    
     readAllCalibParams(acc_params, gyr_params, suffix, skew, scale, bias, gmat)
 
 plotAllCalibParams(skew, scale, bias, gmat, plot_path)
-#%%
-os.system('mv ' + data_path + '/*.png' +' ' + plot_path)
