@@ -39,10 +39,11 @@ g_mag = 9.805622
 nominal_gyr_scale = 250 * np.pi / (2.0 * 180.0 * 16384.0)
 nominal_acc_scale = g_mag/16384.0
 
-suffixes = ['base', 'optGyrBias', 'accMeans'] 
+#this should meet the diferent calibration option in applyCalib.py
+suffixes = ['base', 'optGyrBias', 'accMeans_base', 'accMeans_optGyrBias', 'gyroG'] 
 
 start_time = 10
-end_time = 100
+end_time = 40
 
 #%% get raw data files
 
@@ -110,7 +111,7 @@ for acc, gyr in zip(acc_files, gyr_files):
             bi = bias[suffix]['gyr'][calib_n]  
             gi = gmat[suffix]['gyr'][calib_n]  
             #temp_acc.append(str(suffix) + "_" + str(calib_n))
-            temp_gyr.append(calibrate(gyr_data[gyr], sk, sc, bi, gi, acc_data[acc]) )
+            temp_gyr.append(calibrate(gyr_data[gyr], sk, sc, bi, gi, temp_acc[-1]) )
 
         temp_acc = np.array(temp_acc)
         temp_gyr = np.array(temp_gyr)
@@ -269,7 +270,7 @@ from matplotlib.patches import Patch as mpatches
 plt.close('all')
 
 alpha = 1
-mss = ['s','x']
+mss = ['s','x', '^']
 plt.figure(figsize=(20,20))
 
 for acc_file, gyr_file in zip(errors_acc, errors_gyr):
@@ -294,7 +295,8 @@ plt.ylabel('|Lin. Velocity error|')
 l0 = mlines([],[], marker='d', ls='', label='uncalibrated')
 l1 = mlines([],[], marker='s', ls='', label= suffixes[0])
 l2 = mlines([],[], marker='x', ls='', label= suffixes[1])
-handles1 = [l0,l1,l2]
+l3 = mlines([],[], marker='^', ls='', label= suffixes[2])
+handles1 = [l0,l1,l2, l3]
 legend1 = plt.legend(handles=handles1, prop={'size':12});
 
 colours = plt.rcParams['axes.prop_cycle'].by_key()['color']

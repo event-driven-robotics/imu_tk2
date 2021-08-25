@@ -37,7 +37,8 @@ raw_gyr_files_regex = '/test/gyr[0-9][0-9]'
 g_mag = 9.805622
 nominal_gyr_scale = 250 * np.pi / (2.0 * 180.0 * 16384.0)
 nominal_acc_scale = g_mag/16384.0
-suffixes = ['base', 'optGyrBias'] 
+suffixes = ['base', 'optGyrBias', 'accMeans_base', 'accMeans_optGyrBias', 'gyroG'] 
+
 
 #%% get raw data files
 
@@ -107,7 +108,7 @@ for acc, gyr in zip(acc_files, gyr_files):
             bi = bias[suffix]['gyr'][calib_n]  
             gi = gmat[suffix]['gyr'][calib_n]  
             #temp_acc.append(str(suffix) + "_" + str(calib_n))
-            temp_gyr.append(calibrate(gyr_data[gyr], sk, sc, bi, gi, acc_data[acc]) )
+            temp_gyr.append(calibrate(gyr_data[gyr], sk, sc, bi, gi, temp_acc[-1]) )
 
         temp_acc = np.array(temp_acc)
         temp_gyr = np.array(temp_gyr)

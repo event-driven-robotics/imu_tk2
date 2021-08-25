@@ -25,7 +25,7 @@ int main(int argc, char** argv)
   string acc_file, gyr_file, suffix;
   double g_mag, init_interval_duration_, gyr_dt_, nominal_1g_norm_, init_acc_bias_, init_gyr_scale_, alpha_;
   int min_num_intervals_, interval_n_samples_, max_num_iterations_; 
-  bool acc_use_means_, optimize_gyro_bias_, verbose_output_;
+  bool acc_use_means_, optimize_gyro_bias_, verbose_output_, use_acc_G_, use_gyr_G_;
 
   po::options_description po("Options for imu_tk2");
   po.add_options()
@@ -48,6 +48,8 @@ int main(int argc, char** argv)
       // bool params
       ("acc_use_means", po::value<bool>(& acc_use_means_)->default_value(false), "Use means for acc")
       ("opt_gyr_b", po::value<bool>(& optimize_gyro_bias_)->default_value(false), "if false calculates the gyro biases bases on the initial static interval")
+      ("use_acc_G", po::value<bool>(& use_acc_G_)->default_value(false), "calculate acc proportional bias for accelerometer")
+      ("use_gyr_G", po::value<bool>(& use_gyr_G_)->default_value(false), "calculate acc proportional bias for gyroscope")
       ("verbose", po::value<bool>(& verbose_output_)->default_value(true), "Print a lot of stuff")
   
       // Initial calibration guesses
@@ -98,6 +100,8 @@ int main(int argc, char** argv)
 
   // bool params
   mp_calib.enableAccUseMeans(acc_use_means_);
+  mp_calib.enableAccG(use_acc_G_);
+  mp_calib.enableGyrG(use_gyr_G_);
   mp_calib.enableGyroBiasOptimization(optimize_gyro_bias_);
   mp_calib.enableVerboseOutput(verbose_output_);
  

@@ -341,6 +341,12 @@ public:
   /** @brief Set nominal reading for 1g */
   void set1g(_T g){nominal_1g_norm_ = g; }; 
 
+  /** @brief Set to use G matrix in ACC calibration */
+  void enableAccG(bool enabled){use_acc_G_ = enabled; }; 
+
+  /** @brief Set to use G matrix in GYR calibration */
+  void enableGyrG(bool enabled){use_gyr_G_ = enabled; }; 
+
   /** @brief If the parameter enabled is true, the gyroscopes biases are estimated along
    *         with the calibration parameters. If false, the gyroscopes biases 
    *         (computed in the initial static period) are assumed known. */ 
@@ -395,7 +401,7 @@ private:
   int max_num_iterations_;
   _T init_interval_duration_;
   int interval_n_samples_;
-  bool acc_use_means_;
+  bool acc_use_means_, use_acc_G_, use_gyr_G_;
   _T gyro_dt_;
   bool optimize_gyro_bias_;
   std::vector< DataInterval > min_cost_static_intervals_;

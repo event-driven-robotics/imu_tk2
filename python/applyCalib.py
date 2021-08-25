@@ -69,6 +69,9 @@ for acc, gyr in zip(acc_files, gyr_files):
                '--gyr_file='+gyr, 
                '--suffix='+suffix,
                '--opt_gyr_b=false',
+               '--max_iter=500',
+               '--acc_use_means=false',
+               '--use_gyr_G=false'
                ]
     print(command)
     subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -92,12 +95,40 @@ for acc, gyr in zip(acc_files, gyr_files):
                '--gyr_file='+gyr, 
                '--suffix='+suffix,
                '--opt_gyr_b=true',
-               '--max_iter=500'
+               '--max_iter=500',
+               '--acc_use_means=false',
+               '--use_gyr_G=false'
                ]
     print(command)
     subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 #%% Perform calibrations on the files
-suffix = 'accMeans'
+suffix = 'accMeans_base'
+
+for acc, gyr in zip(acc_files, gyr_files):
+    acc_params = params_path + '/' + acc.split('/')[-1] + '.'+suffix
+    gyr_params = params_path + '/' + gyr.split('/')[-1] + '.'+suffix
+    
+    # skip if these were already performed
+    if(os.path.isfile(acc_params) and os.path.isfile(gyr_params)):
+        print('already calculated ' + acc_params + ' and ' + gyr_params)
+        continue
+
+    print(acc, gyr)
+
+    command = [imu_tk2_app,
+               '--acc_file='+acc, 
+               '--gyr_file='+gyr, 
+               '--suffix='+suffix,
+               '--opt_gyr_b=false',
+               '--max_iter=500',
+               '--acc_use_means=true',
+               '--use_gyr_G=false'
+               ]
+    print(command)
+    subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+#%% Perform calibrations on the files
+suffix = 'accMeans_optGyrBias'
 
 for acc, gyr in zip(acc_files, gyr_files):
     acc_params = params_path + '/' + acc.split('/')[-1] + '.'+suffix
@@ -116,13 +147,39 @@ for acc, gyr in zip(acc_files, gyr_files):
                '--suffix='+suffix,
                '--opt_gyr_b=true',
                '--max_iter=500',
-               '--acc_use_means=true'
+               '--acc_use_means=true',
+               '--use_gyr_G=false'
+               ]
+    print(command)
+    subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+#%% Perform calibrations on the files
+suffix = 'gyroG'
+
+for acc, gyr in zip(acc_files, gyr_files):
+    acc_params = params_path + '/' + acc.split('/')[-1] + '.'+suffix
+    gyr_params = params_path + '/' + gyr.split('/')[-1] + '.'+suffix
+    
+    # skip if these were already performed
+    if(os.path.isfile(acc_params) and os.path.isfile(gyr_params)):
+        print('already calculated ' + acc_params + ' and ' + gyr_params)
+        continue
+
+    print(acc, gyr)
+
+    command = [imu_tk2_app,
+               '--acc_file='+acc, 
+               '--gyr_file='+gyr, 
+               '--suffix='+suffix,
+               '--opt_gyr_b=true',
+               '--max_iter=500',
+               '--acc_use_means=false',
+               '--use_gyr_G=true'
                ]
     print(command)
     subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     
 #%%
-suffixes = ['base', 'optGyrBias', 'accMeans'] 
+suffixes = ['base', 'optGyrBias', 'accMeans_base', 'accMeans_optGyrBias', 'gyroG'] 
 
 os.system('mv ' + data_path + '/*.png' +' ' + plot_path)
 for suffix in suffixes:
