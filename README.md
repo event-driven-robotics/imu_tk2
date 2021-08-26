@@ -5,16 +5,21 @@ Imu calibration based on https://bitbucket.org/alberto_pretto/imu_tk/src/master/
 
 for installing and running instructions
 
-Ceres solver is required:
+##Requirements##
+#! Ceres solver:
 http://ceres-solver.org/installation.html
 
-lib boost as well:
+#! lib boost:
+```
 sudo apt-get install libboost-all-dev
+```
 
-Make sure Eigen is correctly installed or make some symb links:
+#! Make sure Eigen is correctly installed or make some symb links:
+```
 cd /usr/include
 sudo ln -sf eigen3/Eigen Eigen
 sudo ln -sf eigen3/unsupported unsupported
+```
 
 # Origninal imu_tk README below #
 

@@ -1,0 +1,57 @@
+%----------------------------------------------------------------------------------------
+%	PACKAGES AND DOCUMENT CONFIGURATIONS
+%----------------------------------------------------------------------------------------
+
+\documentclass[10pt,a4paper]{article}
+
+% Adjusting margins to personal my need
+\addtolength{\oddsidemargin}{-.5in}
+\addtolength{\evensidemargin}{-.5in}
+\addtolength{\textwidth}{1in}
+\addtolength{\topmargin}{-.5in}
+\addtolength{\textheight}{1in}
+
+\input{tex/includes}
+\input{tex/commands}
+
+
+
+%----------------------------------------------------------------------------------------
+%	MAIN PART
+%----------------------------------------------------------------------------------------
+\begin{document}
+
+\title{IMU TK 2}
+\author{Leandro de Souza Rosa \\ \texttt{leandro.desouzarosa@iit.it}}
+\date{\today} % Date for the report
+\maketitle % Inserts the title, author and date
+
+%----------------------------------------------------------------------------------------
+%	Table of Content
+%----------------------------------------------------------------------------------------
+
+\setcounter{tocdepth}{2}
+\tableofcontents
+\clearpage
+
+%----------------------------------------------------------------------------------------
+%	Main Part
+%----------------------------------------------------------------------------------------
+
+\input{tex/intro}
+\input{tex/method}
+\input{tex/dataCollection}
+\input{tex/tool}
+\input{tex/tests}
+\clearpage
+
+%----------------------------------------------------------------------------------------
+%	Bibliography
+%----------------------------------------------------------------------------------------
+
+\clearpage
+\bibliographystyle{unsrt}
+\bibliography{bibliography/biblio.bib}
+
+
+\end{document}

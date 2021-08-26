@@ -1,0 +1,16 @@
+\newcommand{\source}[1]{\textbf{Source:} #1}
+
+\DeclareMathOperator*{\argmin}{argmin}
+
+\usepackage[many]{tcolorbox}  
+\newtcolorbox{important}{%
+	tikznode boxed title,
+	enhanced,
+	arc=0mm,
+	interior style={white},
+	attach boxed title to top center= {yshift=-\tcboxedtitleheight/2},
+	fonttitle=\bfseries,
+	colbacktitle=white,coltitle=black,
+	boxed title style={size=normal,colframe=white,boxrule=0pt},
+	title={Important}
+}

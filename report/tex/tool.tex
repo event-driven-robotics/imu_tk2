@@ -1,0 +1,168 @@
+\section{IMU TK 2}\label{sec: tool}
+
+In this section we describe the installation and usage of the calibration toll.
+
+The code is available at: \url{https://github.com/event-driven-robotics/imu_tk2}
+%
+Refer to the \texttt{README} file for dependencies and installation.
+%
+Table  \ref{tab: repo structure} summarises the repository structure and its contents.
+
+\begin{table}[h]
+	\centering
+	\caption{Brief description of the repository contents.}
+	\label{tab: repo structure}
+	\begin{tabulary}{\linewidth}{c|L}
+		\toprule
+		Folder & Description \\\midrule
+		apps & c++ top level application code. \texttt{test\_imu\_calib.cpp} is the main file, which uses \texttt{lib boost} to receive the application options. \\\hline
+		include/imu\_tk & Contains the header files \texttt{.h}. \\\hline
+		lib & Static library files. \\\hline
+		python & Contains scripts to run the application over multiple calibration and test data files, evaluate, and plot the results. \\\hline
+		report & The files of this report. \\\hline
+		src & Contains the main c++ files. The \texttt{io\_utils.cpp} implements functions to read the data collected with the \texttt{IMUCalibDumper} module described in Section \ref{sec: data collection}. The \texttt{calibration.cpp} file implements the main calibration steps. \\\hline
+		data.zip & Contains $10$ calibration data and $10$ test data used for evaluation. \\\bottomrule
+	\end{tabulary}
+\end{table}
+
+Note that the structure, data types, and templated used in the implementation are legacy from the original \texttt{IMU\_TK} software.
+
+After installation, you can see the implemented options (described on Section \ref{subsec: options}) by running:
+
+\begin{minted}{bash}
+	$ ./bin/test_imu_calib --help
+\end{minted}
+
+\subsection{Options}\label{subsec: options}
+
+\subsubsection*{acc\_file, gyr\_file}
+Path for the file containing the accelerometer and gyroscope data for calibration. Those should be the file paths passed as arguments to the \texttt{IMUCalibDumper} module described in Section \ref{sec: data collection}.
+
+\subsubsection*{g\_mag}
+Magnitude of the local gravity. The value is retrieved from public datasets. A list of tools and datasets for calculating the local data can be found in \url{https://www.isobudgets.com/how-to-calculate-local-gravity/}.
+
+\subsubsection*{init\_interval\_duration}
+Duration of the initial static interval $t_{init}$ (described in Section \ref{sec: data collection}). If the tool will not perform the calibration if it fails to identify an initial interval longer than $t_{init}$.
+
+\subsubsection*{gyr\_dt}
+Gyroscope sampling period used in the integration  to compute the angular displacement between to static interval (Equation \ref{eq: gyr opt}).
+%
+Leave this option unset, or set it to $-1$, and the toll will automatically calculate the $dt$ from the samples timestamps.
+
+\subsubsection*{nominal\_1g\_norm}
+Conversion value between the IMU scale and $1g$ given by the data sheet. This value is used as an initial guess for the accelerometer calibration.
+
+\subsubsection*{alpha}
+Unused.
+
+\subsubsection*{min\_num\_intervals}
+Minimal number of static intervals for performing the calibration. The toll will not perform the calibration if it is unable to detect at least this number of static intervals that last longer than $t_{wait}~s$.
+%
+The recommended number is $>36$.
+
+\subsubsection*{interval\_n\_samples}
+Minimal number of IMU samples in each static interval. This number can be estimated by dividing $t_{wait}$ by the IMU sample rate.
+%
+This value is used as a condition to count the minimal number os static intervals defined by the option \texttt{min\_num\_intervals}.
+
+\subsubsection*{max\_iter}
+Sets the maximum number of iterations for the Ceres solved to optimise Equations \ref{eq: acc opt} and \ref{eq: gyr opt}.
+%
+In our tests, with the initial conditions set up properly, the solver is typically able to find a solution with tenths of iterations.
+
+\begin{important}
+	It is worthy mentioning that the optimisations have no constraints, meaning that the solver has freedom to select arbitrary values for some calibration parameters, which is compensated by other parameters.
+	%
+	Furthermore, the solver is sensitive to the initial conditions.
+	%
+	As such, a large number of iterations indicate that the initial conditions might not be properly set.
+\end{important}
+
+\subsubsection*{acc\_use\_means}
+Instructs the tool to use the mean of each static interval to compute the residuals during the optimizations of Equations \ref{eq: acc opt} and \ref{eq: gyr opt}.
+%
+Otherwise, it the tool will add the residual for each IMU reading during the static interval.
+
+As such, with this option turned on, high-frequency noise is filtered, and the solver speed is improved (not a significant difference)
+%
+Our tests indicate that the impact of this option is not significant.
+
+\subsubsection*{opt\_gyr\_b}
+In our tests, we noticed that calculating the gyroscope biases $B^g$ only from the initial static interval was inconsistent.
+%
+As such, we implemented an optimisation for calculating $B^g$ bases on all static intervals.
+%
+This is done by optimising 
+
+\begin{equation}
+	\argmin_{B^g} \left\|var(gyr, B^g)\right\|
+\end{equation}
+
+Where, $var(gyr)$ is the variance of $B^g$ in the static intervals.
+%
+However, due to restrictions imposed by the solver, the above optimisation cannot be implemented as it is.
+%
+Thus we develop the optimisation as follows:
+
+\begin{eqnarray}
+	var(gyr, B^g) & = \sqrt{\sum(\tilde{gyr}-gyr)^2} \\
+		& = \sqrt{\sum(\tilde{B^g} - gyr )^2} \\
+		& = \sqrt{\sum(B^g - gyr)^2}
+\end{eqnarray}
+
+Where $\tilde{gyr}$ is the average value of the gyroscope readings during the static interval.
+%
+From Equations $5$ to $6$, we use the fact that the reading are composed solemn by the bias, given the data is static.
+%
+From Equations $6$ to $7$, we use the fact that the bias should be constant, allowing to eliminate the mean.
+
+As such, when the \texttt{$opt\_gyr\_b$} is turned on, $B^g$ is estimated by optimising:
+
+\begin{equation}
+	\argmin_{B^g} \left\|B^g-gyr\right\|
+\end{equation}
+
+\subsubsection*{use\_acc\_G}
+
+Unused.
+
+\subsubsection*{use\_gyr\_G}
+According to \cite{altinoz2018determining} the gyroscope bias has a component proportional to the accelerometer readings.
+%
+We extended the optimisation to estimate the gyroscope calibration parameters (Equation \ref{eq: gyr opt}) to also estimate this accelerometer-dependent factor as:
+
+\begin{equation}
+	\argmin_{K^g, S^g, G^g} \left\|(\tilde{g}_{t_{i+1}}-\tilde{g}_{t_i}) - \int_{t_i}^{t_{i+1}} K^gS^g(gyr - B^g - G^gacc)dt\right\|
+\end{equation}
+
+Where $G^g_{3\times 3}$ is a matrix which encodes the relation between the accelerometer reading and the gyroscope biases.
+%
+The calibrated gyroscope values is calculated according to:
+
+\begin{equation} 
+	gyr^* = K^gS^g(gyr - B^g - G^gacc) 
+\end{equation}
+ 
+ 
+Results indicate a non-significant reduction on the error during our integration tests (see Section \ref{subsec: integration tests}).
+
+
+\subsubsection*{verbose}
+
+Print debug, staging, and solver messages on the terminal.
+
+\subsubsection*{init\_acc\_bias}
+Initial guess for the accelerometer bias.
+
+\subsubsection*{init\_gyr\_scale}
+Analogous to \texttt{nominal\_1g\_norm}, this value encodes the conversion factor between the raw gyroscope reading and S.I. obtained from the IMU data-sheet.
+%
+This value is used as an initial guess for $K^g$.
+
+\subsubsection*{suffix}
+After a successful calibration, the parameters for the accelerometer and gyroscope are saved in two files in the same folder as the calibration data indicated by the \texttt{acc\_file, gyr\_file} parameters.
+%
+The \texttt{suffix} is appended to the name of the resulting parameter file names.
+%
+This is useful when performing many calibrations with different options.
+
